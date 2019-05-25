@@ -1,0 +1,141 @@
+From 800c1e263d634d7c78dc580a6b5748a94beaab9a Mon Sep 17 00:00:00 2001
+From: Andrew Eikum <aeikum@codeweavers.com>
+Date: Thu, 9 May 2019 14:30:19 -0500
+Subject: [PATCH] configure: Regenerate configure
+
+Should be squashed into "xaudio2: Add support for xactengine3" and
+"ntdll: Improve heap allocation performance."
+---
+ configure                 | 57 +++++++++++++++++++++++++++++++++++++++
+ dlls/xaudio2_7/xact_dll.c |  6 ++---
+ include/config.h.in       |  3 +++
+ 3 files changed, 63 insertions(+), 3 deletions(-)
+
+diff --git a/configure b/configure
+index b0e2e5cbf05..0c539aae636 100755
+--- a/configure
++++ b/configure
+@@ -1642,6 +1642,14 @@ enable_x3daudio1_4
+ enable_x3daudio1_5
+ enable_x3daudio1_6
+ enable_x3daudio1_7
++enable_xactengine3_0
++enable_xactengine3_1
++enable_xactengine3_2
++enable_xactengine3_3
++enable_xactengine3_4
++enable_xactengine3_5
++enable_xactengine3_6
++enable_xactengine3_7
+ enable_xapofx1_1
+ enable_xapofx1_2
+ enable_xapofx1_3
+@@ -15184,6 +15192,14 @@ then
+     enable_x3daudio1_5=${enable_x3daudio1_5:-no}
+     enable_x3daudio1_6=${enable_x3daudio1_6:-no}
+     enable_x3daudio1_7=${enable_x3daudio1_7:-no}
++    enable_xactengine3_0=${enable_xactengine3_0:-no}
++    enable_xactengine3_1=${enable_xactengine3_1:-no}
++    enable_xactengine3_2=${enable_xactengine3_2:-no}
++    enable_xactengine3_3=${enable_xactengine3_3:-no}
++    enable_xactengine3_4=${enable_xactengine3_4:-no}
++    enable_xactengine3_5=${enable_xactengine3_5:-no}
++    enable_xactengine3_6=${enable_xactengine3_6:-no}
++    enable_xactengine3_7=${enable_xactengine3_7:-no}
+     enable_xapofx1_1=${enable_xapofx1_1:-no}
+     enable_xapofx1_2=${enable_xapofx1_2:-no}
+     enable_xapofx1_3=${enable_xapofx1_3:-no}
+@@ -18832,6 +18848,39 @@ $as_echo "#define HAVE___BUILTIN_CLZ 1" >>confdefs.h
+ 
+ fi
+ 
++{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for __builtin_ctzl" >&5
++$as_echo_n "checking for __builtin_ctzl... " >&6; }
++if ${ac_cv_have___builtin_ctzl+:} false; then :
++  $as_echo_n "(cached) " >&6
++else
++  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++int
++main ()
++{
++return __builtin_ctzl(1)
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_link "$LINENO"; then :
++  ac_cv_have___builtin_ctzl="yes"
++else
++  ac_cv_have___builtin_ctzl="no"
++fi
++rm -f core conftest.err conftest.$ac_objext \
++    conftest$ac_exeext conftest.$ac_ext
++fi
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_have___builtin_ctzl" >&5
++$as_echo "$ac_cv_have___builtin_ctzl" >&6; }
++if test "$ac_cv_have___builtin_ctzl" = "yes"
++then
++
++$as_echo "#define HAVE___BUILTIN_CTZL 1" >>confdefs.h
++
++fi
++
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __builtin_popcount" >&5
+ $as_echo_n "checking for __builtin_popcount... " >&6; }
+ if ${ac_cv_have___builtin_popcount+:} false; then :
+@@ -20282,6 +20331,14 @@ wine_fn_config_makefile dlls/x3daudio1_4 enable_x3daudio1_4
+ wine_fn_config_makefile dlls/x3daudio1_5 enable_x3daudio1_5
+ wine_fn_config_makefile dlls/x3daudio1_6 enable_x3daudio1_6
+ wine_fn_config_makefile dlls/x3daudio1_7 enable_x3daudio1_7
++wine_fn_config_makefile dlls/xactengine3_0 enable_xactengine3_0
++wine_fn_config_makefile dlls/xactengine3_1 enable_xactengine3_1
++wine_fn_config_makefile dlls/xactengine3_2 enable_xactengine3_2
++wine_fn_config_makefile dlls/xactengine3_3 enable_xactengine3_3
++wine_fn_config_makefile dlls/xactengine3_4 enable_xactengine3_4
++wine_fn_config_makefile dlls/xactengine3_5 enable_xactengine3_5
++wine_fn_config_makefile dlls/xactengine3_6 enable_xactengine3_6
++wine_fn_config_makefile dlls/xactengine3_7 enable_xactengine3_7
+ wine_fn_config_makefile dlls/xapofx1_1 enable_xapofx1_1
+ wine_fn_config_makefile dlls/xapofx1_2 enable_xapofx1_2
+ wine_fn_config_makefile dlls/xapofx1_3 enable_xapofx1_3
+diff --git a/dlls/xaudio2_7/xact_dll.c b/dlls/xaudio2_7/xact_dll.c
+index 8d19551f349..73a761cff60 100644
+--- a/dlls/xaudio2_7/xact_dll.c
++++ b/dlls/xaudio2_7/xact_dll.c
+@@ -62,17 +62,17 @@ static inline IXAudio2Impl *impl_from_IXAudio27(IXAudio27 *iface)
+ }
+ #endif
+ #if XACT3_VER == 0
+-static inline XA2VoiceImpl *impl_from_IXAudio20MasteringVoice(IXAudio20MasteringVoice *iface)
++inline XA2VoiceImpl *impl_from_IXAudio20MasteringVoice(IXAudio20MasteringVoice *iface)
+ {
+     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio20MasteringVoice_iface);
+ }
+ #elif XACT3_VER <= 3
+-static inline XA2VoiceImpl *impl_from_IXAudio23MasteringVoice(IXAudio23MasteringVoice *iface)
++inline XA2VoiceImpl *impl_from_IXAudio23MasteringVoice(IXAudio23MasteringVoice *iface)
+ {
+     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio23MasteringVoice_iface);
+ }
+ #else
+-static inline XA2VoiceImpl *impl_from_IXAudio27MasteringVoice(IXAudio27MasteringVoice *iface)
++inline XA2VoiceImpl *impl_from_IXAudio27MasteringVoice(IXAudio27MasteringVoice *iface)
+ {
+     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio27MasteringVoice_iface);
+ }
+diff --git a/include/config.h.in b/include/config.h.in
+index cea7b88780d..a95944488c1 100644
+--- a/include/config.h.in
++++ b/include/config.h.in
+@@ -1440,6 +1440,9 @@
+ /* Define to 1 if you have the `__builtin_clz' built-in function. */
+ #undef HAVE___BUILTIN_CLZ
+ 
++/* Define to 1 if you have the `__builtin_ctzl' built-in function. */
++#undef HAVE___BUILTIN_CTZL
++
+ /* Define to 1 if you have the `__builtin_popcount' built-in function. */
+ #undef HAVE___BUILTIN_POPCOUNT
+ 

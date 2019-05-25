@@ -906,9 +906,9 @@ index b69d2eb371f..2be405e7ae7 100644
 --- a/dlls/kernel32/tests/thread.c
 +++ b/dlls/kernel32/tests/thread.c
 @@ -102,6 +102,8 @@ static NTSTATUS (WINAPI *pNtQueryInformationThread)(HANDLE,THREADINFOCLASS,PVOID
- static BOOL (WINAPI *pGetThreadGroupAffinity)(HANDLE,GROUP_AFFINITY*);
  static BOOL (WINAPI *pSetThreadGroupAffinity)(HANDLE,const GROUP_AFFINITY*,GROUP_AFFINITY*);
  static NTSTATUS (WINAPI *pNtSetInformationThread)(HANDLE,THREADINFOCLASS,LPCVOID,ULONG);
+ static NTSTATUS (WINAPI *pNtSetLdtEntries)(ULONG,ULONG,ULONG,ULONG,ULONG,ULONG);
 +static HRESULT (WINAPI *pSetThreadDescription)(HANDLE,const WCHAR *);
 +static HRESULT (WINAPI *pGetThreadDescription)(HANDLE,WCHAR **);
  
@@ -1470,9 +1470,9 @@ index f1c883167ed..50b3323ae9f 100644
 --- a/dlls/user32/focus.c
 +++ b/dlls/user32/focus.c
 @@ -156,6 +156,8 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
-                       (LPARAM)previous );
-         if (GetAncestor( hwnd, GA_PARENT ) == GetDesktopWindow())
-             PostMessageW( GetDesktopWindow(), WM_PARENTNOTIFY, WM_NCACTIVATE, (LPARAM)hwnd );
+ 
+         if (hwnd == GetForegroundWindow() && !IsIconic( hwnd ))
+             USER_Driver->pSetActiveWindow( hwnd );
 +
 +        imm_activate_window( hwnd );
      }
@@ -1791,3 +1791,84 @@ index 2b049eb91f8..e6948a73427 100644
  HKLM,"System\CurrentControlSet\Services\Eventlog\Application",,16
  HKLM,"System\CurrentControlSet\Services\Eventlog\System","Sources",0x10000,""
  HKLM,"System\CurrentControlSet\Services\Tcpip\Parameters","DataBasePath",2,"%11%\drivers"
+
+From aef0f1638ce13db03a4d3c0fe53972f44443c854 Mon Sep 17 00:00:00 2001
+From: Patryk Obara <dreamer.tan@gmail.com>
+Date: Fri, 26 Apr 2019 20:40:31 +0200
+Subject: [PATCH] winex11: Fill WM_CLASS based on Steam appid
+
+Some desktop environments (Gnome 3, Cinnamon) decide on an application
+icon in the following order:
+
+ - If the first string in WM_CLASS property can be correlated to
+  a name or StartupWMClass key in a .desktop entry file, then
+  the associated icon will be used.
+ - If the second string in WM_CLASS property can be correlated to
+  a name or StartupWMClass key in a .desktop entry file, then
+  the associated icon will be used.
+ - If the application has indicated an icon resource through WM_HINTS
+  property, then the associated X window or pixmaps will be used.
+
+Upstream Wine usually deals with this by placing a .desktop file with
+StartupWMClass filled to match first string in WM_CLASS property
+(which is the name of exe file being run).
+
+Wine in Proton does not do it, but still puts "Wine" as second string,
+therefore desktop environment can't differentiate between Wine in
+Proton and Wine installed in OS.
+
+By replacing "Wine" with "steam_app_<appid>" we force DE to fallback
+to icon indicated by WM_HINTS (ico file embedded in exe file).
+Steam can override this behaviour by installing properly crafted
+.desktop entry file.  If SteamAppId environment variable is missing,
+then generic "steam_proton" name is used instead.
+---
+ dlls/winex11.drv/window.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
+index 1ec7c706511..9ae3da3d4a2 100644
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -870,10 +870,13 @@ static void set_initial_wm_hints( Display *display, Window window )
+     /* class hints */
+     if ((class_hints = XAllocClassHint()))
+     {
+-        static char wine[] = "Wine";
++        static char steam_proton[] = "steam_proton";
++        char proton_app_class[128];
++        const char *app_id = getenv("SteamAppId");
+ 
++        snprintf(proton_app_class, sizeof(proton_app_class), "steam_app_%s", app_id);
+         class_hints->res_name = process_name;
+-        class_hints->res_class = wine;
++        class_hints->res_class = app_id ? proton_app_class : steam_proton;
+         XSetClassHint( display, window, class_hints );
+         XFree( class_hints );
+     }
+
+From 7e91b897e69854cb3afe761f48ef7c9b496ecf95 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?J=C3=B3zef=20Kucia?= <jkucia@codeweavers.com>
+Date: Wed, 1 May 2019 12:28:12 +0200
+Subject: [PATCH] vulkan-1: Prefer built-in DLL.
+
+Games may ship with their own Vulkan loader.
+---
+ dlls/vulkan-1/vulkan.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/dlls/vulkan-1/vulkan.c b/dlls/vulkan-1/vulkan.c
+index d3b35603a17..4926cf9bf4f 100644
+--- a/dlls/vulkan-1/vulkan.c
++++ b/dlls/vulkan-1/vulkan.c
+@@ -32,10 +32,6 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
+ 
+     switch (reason)
+     {
+-        case DLL_WINE_PREATTACH:
+-            /* Prefer native as it provides more functionality. */
+-            return FALSE;
+-
+         case DLL_PROCESS_ATTACH:
+             DisableThreadLibraryCalls(hinst);
+             return TRUE;

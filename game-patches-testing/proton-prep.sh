@@ -1,59 +1,33 @@
 #!/bin/bash
 
-    #DXVK ASYNC PATCH
-    cd dxvk
-    git reset --hard HEAD
-    git clean -xdf
-
-    echo "applying async patch to dxvk and enabling it for warframe by default"
-    patch -Np1 < ../game-patches-testing/dxvk-warframe-async-patch.patch
-    cd ..
-
-    #ESYNC UPDATE
-    cd esync
-    git reset --hard HEAD
-    git clean -xdf
-
-    patch -Np1 < ../game-patches-testing/esync-compat-fixes-r3.patch
-    patch -Np1 < ../game-patches-testing/esync-compat-fixes-r3.1.patch
-    patch -Np1 < ../game-patches-testing/esync-compat-fixes-r3.2.patch
-    patch -Np1 < ../game-patches-testing/esync-compat-fixes-r3.3.patch
-    patch -Np1 < ../game-patches-testing/esync-compat-fixes-r3.4.patch
-    cd ..
-
 
     #WINE SYSTEM PERFORMANCE PATCHES
-    cd wine
+    cd lutris-wine
     git reset --hard HEAD
     git clean -xdf
 
-    echo "system tray fix for kde plasma"
-    patch -Np1 < ../game-patches-testing/plasma_systray_fix.patch
-
-    echo "wine key translation fix from staging"
-    patch -Np1 < ../game-patches-testing/wine-staging-key-translation-fix.patch
+    #echo "Applying wine-staging patches..."
+    #../wine-staging/patches/patchinstall.sh DESTDIR="." --all -W xaudio2-revert -W xaudio2_7-CreateFX-FXEcho -W xaudio2_7-WMA_support -W xaudio2_CommitChanges -W winex11.drv-mouse-coorrds
 
     #WINE GAME SPECIFIC PATCHES
-
 
     echo "fix for Skyrim Script Extender not working"
     patch -Np1 < ../game-patches-testing/f4skyrimse-fix.patch
 
-    echo "mech warrior online patch"
-    patch -Np1 < ../game-patches-testing/mwo.patch
-
-    echo "resident evil 4 patch"
-    patch -Np1 < ../game-patches-testing/resident_evil_4_hack.patch
-
-    echo "world of final fantasy patch"
-    patch -Np1 < ../game-patches-testing/woff-hack.patch
+    echo "ffxiv launcher patch"
+    patch -Np1 < ../game-patches-testing/ffxiv-launcher.patch
 
     echo "warframe F6 screenshot button fix"
     patch -Np1 < ../game-patches-testing/warframe-f6-screenshot-fix.patch
 
-    echo "uplay api loadstring patch"
-    patch -Np1 < ../game-patches-testing/uplay-api-loadstring-fix.patch
+    echo "Mech Warrior Online patch"
+    patch -Np1 < ../game-patches-testing/mwo.patch
 
+    echo "Resident Evil 4 patch"
+    patch -Np1 < ../game-patches-testing/resident_evil_4_hack.patch
+
+    echo "World of Final Fantasy patch"
+    patch -Np1 < ../game-patches-testing/woff-hack.patch
 
     #WINE FAUDIO PATCHES
 
@@ -65,38 +39,28 @@
     patch -Np1 < ../game-patches-testing/faudio-proton-xact-support-2.patch
     patch -Np1 < ../game-patches-testing/faudio-proton-fix-ed05940.patch
     patch -Np1 < ../game-patches-testing/faudio-proton-fix-837f11c.patch
+    patch -Np1 < ../game-patches-testing/faudio-proton-use-dxredist-x3daudio-xapofx.patch
+    patch -Np1 < ../game-patches-testing/faudio-proton-configure-use-dxredist-x3daudio-xapof.patch
 
-
-    #WINE PROTONIFY
-    echo "converting normal wine build into proton build"
+    #protonify
     patch -Np1 < ../game-patches-testing/proton-tkg.patch
 
-    for _f in "../esync/"*.patch; do
-        git apply -C1 --verbose < "${_f}"
-    done
+    #applying overall game performance fixes
+    patch -Np1 < ../game-patches-testing/FS_bypass_compositor.patch
+    patch -Np1 < ../game-patches-testing/valve_proton_fullscreen_hack-staging.patch
 
-    # this is needed for wine 4.5+
-    patch -Np1 < ../game-patches-testing/esync-no_kernel_obj_list.patch
+
     patch -Np1 < ../game-patches-testing/proton-restore-unicode.patch
-    patch -Np1 < ../game-patches-testing/valve-gnutls.patch
-    patch -Np1 < ../game-patches-testing/valve-proton-sdl-joy.patch
-    patch -Np1 < ../game-patches-testing/valve-hide-prefix-update-window.patch
-    patch -Np1 < ../game-patches-testing/valve-wined3d-d3d11.patch
-    patch -Np1 < ../game-patches-testing/valve-gdi32.patch
-    patch -Np1 < ../game-patches-testing/valve-FS_bypass_compositor.patch
-    patch -Np1 < ../game-patches-testing/valve-winex11-fullscreen-hack.patch
     patch -Np1 < ../game-patches-testing/valve-amd-ags.patch
-    patch -Np1 < ../game-patches-testing/valve-unity-mouse-pointer-drift.patch
-    patch -Np1 < ../game-patches-testing/valve-pulseaudio-patchset.patch
-    patch -Np1 < ../game-patches-testing/valve-winevulkan-patchset.patch
-    patch -Np1 < ../game-patches-testing/valve-ntdll.patch
-    patch -Np1 < ../game-patches-testing/valve-user32.patch
+    patch -Np1 < ../game-patches-testing/valve-gnutls.patch
+    patch -Np1 < ../game-patches-testing/valve-hide-prefix-update-window.patch
     patch -Np1 < ../game-patches-testing/valve-winemac.patch
-    patch -Np1 < ../game-patches-testing/valve-windowscodecs.patch
-    patch -Np1 < ../game-patches-testing/valve-wine-mono.patch
-
-    # large address awareness
-    patch -Np1 < ../game-patches-testing/valve-LAA.patch
+    patch -Np1 < ../game-patches-testing/valve-unity-mouse-pointer-drift.patch
+    patch -Np1 < ../game-patches-testing/use_clock_monotonic.patch
+    patch -Np1 < ../game-patches-testing/LAA-staging.patch
+    patch -Np1 < ../game-patches-testing/proton-sdl-joystick.patch
+    patch -Np1 < ../game-patches-testing/valve-proton-winebus.patch
+    patch -Np1 < ../game-patches-testing/valve-pulseaudio-patchset.patch
 
     #WINE CUSTOM PATCHES
     #add your own custom patch lines below

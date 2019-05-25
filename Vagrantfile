@@ -1,20 +1,62 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+module OS
+  def OS.windows?
+    (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
+  end
+
+  def OS.mac?
+    (/darwin/ =~ RUBY_PLATFORM) != nil
+  end
+
+  def OS.unix?
+    !OS.windows?
+  end
+
+  def OS.linux?
+    OS.unix? and not OS.mac?
+  end
+end
+
 # Vagrant file for setting up a build environment for Proton.
+if OS.linux?
+  cpus = `nproc`.to_i
+  # meminfo shows KB and we need to convert to MB
+  memory = `grep 'MemTotal' /proc/meminfo | sed -e 's/MemTotal://' -e 's/ kB//'`.to_i / 1024 / 2
+elsif OS.mac?
+  cpus = `sysctl -n hw.physicalcpu`.to_i
+  # sysctl shows bytes and we need to convert to MB
+  memory = `sysctl hw.memsize | sed -e 's/hw.memsize: //'`.to_i / 1024 / 1024 / 2
+else
+  cpus = 1
+  memory = 1024
+  puts "Vagrant launched from unsupported platform."
+end
+puts "Platform: " + cpus.to_s + " CPUs, " + memory.to_s + " MB memory"
 
 Vagrant.configure(2) do |config|
+  #libvirt doesn't have a decent synced folder, so we have to use vagrant-sshfs.
+  #This is not needed for virtualbox, but I couldn't find a way to use a
+  #different synced folder type per provider, so we always use it.
+  config.vagrant.plugins = "vagrant-sshfs"
+
   config.vm.box = "generic/debian9"
 
   config.vm.provider "virtualbox" do |v|
-    v.cpus = `nproc`.to_i
-    # meminfo shows KB and we need to convert to MB
-    v.memory = `grep 'MemTotal' /proc/meminfo | sed -e 's/MemTotal://' -e 's/ kB//'`.to_i / 1024 / 2
+    v.cpus = cpus
+    v.memory = memory
   end
 
-  #set up shared and rsynced folders
-  config.vm.synced_folder "./vagrant_share/", "/vagrant/", id: "share", create: true
-  config.vm.synced_folder ".", "/home/vagrant/proton", id: "proton", type: "rsync", rsync__exclude: ["/output/", "vagrant_share"]
+  config.vm.provider "libvirt" do |v|
+    v.cpus = cpus
+    v.memory = memory
+    v.random_hostname = true
+    v.default_prefix = ENV['USER'].to_s.dup.concat('_').concat(File.basename(Dir.pwd))
+  end
+
+  config.vm.synced_folder "./vagrant_share/", "/vagrant/", create: true, type: "sshfs", sshfs_opts_append: "-o cache=no"
+  config.vm.synced_folder ".", "/home/vagrant/proton", id: "proton", type: "rsync", rsync__exclude: ["vagrant_share"]
 
   #this is where the VM is initialized on first setup
   config.vm.provision "shell", privileged: "true", inline: <<-SHELL

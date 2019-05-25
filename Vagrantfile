@@ -44,7 +44,6 @@ Vagrant.configure(2) do |config|
     v.memory = memory
   end
 
-  config.vm.synced_folder "./vagrant_share/", "/vagrant/", create: true, type: "sshfs", sshfs_opts_append: "-o cache=no"
   config.vm.synced_folder ".", "/home/vagrant/proton", id: "proton", type: "rsync", rsync__exclude: ["vagrant_share"]
 
   #this is where the VM is initialized on first setup

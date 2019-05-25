@@ -2,9 +2,9 @@
 
 
     #WINE SYSTEM PERFORMANCE PATCHES
-    cd lutris-wine
-    git reset --hard HEAD
-    git clean -xdf
+    cd wine
+    #git reset --hard HEAD
+    #git clean -xdf
 
     #echo "Applying wine-staging patches..."
     #../wine-staging/patches/patchinstall.sh DESTDIR="." --all -W xaudio2-revert -W xaudio2_7-CreateFX-FXEcho -W xaudio2_7-WMA_support -W xaudio2_CommitChanges -W winex11.drv-mouse-coorrds
@@ -54,13 +54,11 @@
     patch -Np1 < ../game-patches-testing/valve-amd-ags.patch
     patch -Np1 < ../game-patches-testing/valve-gnutls.patch
     patch -Np1 < ../game-patches-testing/valve-hide-prefix-update-window.patch
-    patch -Np1 < ../game-patches-testing/valve-winemac.patch
     patch -Np1 < ../game-patches-testing/valve-unity-mouse-pointer-drift.patch
     patch -Np1 < ../game-patches-testing/use_clock_monotonic.patch
     patch -Np1 < ../game-patches-testing/LAA-staging.patch
     patch -Np1 < ../game-patches-testing/proton-sdl-joystick.patch
     patch -Np1 < ../game-patches-testing/valve-proton-winebus.patch
-    patch -Np1 < ../game-patches-testing/valve-pulseaudio-patchset.patch
 
     #WINE CUSTOM PATCHES
     #add your own custom patch lines below

@@ -3,11 +3,14 @@
 
     #WINE SYSTEM PERFORMANCE PATCHES
     cd wine
-    #revert bison check for proton
-    git revert --no-commit a4c93936c9493f7619e1877b522eeb809a390dfe
-
     git reset --hard HEAD
     git clean -xdf
+
+    #revert bison check for proton
+    git revert --no-commit a4c93936c9493f7619e1877b522eeb809a390dfe
+    git revert --no-commit 5ea4d5971bff3430c29f1da31166b0a2565347ab
+    git revert --no-commit 2d27c13d5ea76ec80e2a67272c8eafe8527e6af0
+    git revert --no-commit 6d4cdeb658e1cfd7c73643f674a0043006970b44
 
     #echo "Applying wine-staging patches..."
     ../wine-staging/patches/patchinstall.sh DESTDIR="." --all -W xaudio2-revert -W xaudio2_7-CreateFX-FXEcho -W xaudio2_7-WMA_support -W xaudio2_CommitChanges -W winex11.drv-mouse-coorrds
@@ -62,6 +65,9 @@
     patch -Np1 < ../game-patches-testing/LAA-staging.patch
     patch -Np1 < ../game-patches-testing/proton-sdl-joystick.patch
     patch -Np1 < ../game-patches-testing/valve-proton-winebus.patch
+
+    #this is necessary for vrclient
+    patch -Np1 < ../game-patches-testing/valve-wined3d-d3d11.patch
 
     #WINE CUSTOM PATCHES
     #add your own custom patch lines below

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+    #Temporary fix for "Workaround `cannot convert ‘SteamNetworkingMessage_t*’ to ‘SteamNetworkingMessage_t* const*’ in initialization` error
+    cd lsteamclient
+    patch -Np1 < ../game-patches-testing/steamclient_144_workaround.patch
+    cd ..
 
     #WINE SYSTEM PERFORMANCE PATCHES
     cd wine
@@ -54,7 +58,7 @@
     #applying overall game performance fixes
     patch -Np1 < ../game-patches-testing/FS_bypass_compositor.patch
     patch -Np1 < ../game-patches-testing/valve_proton_fullscreen_hack-staging.patch
-
+    patch -Np1 < ../game-patches-testing/proton-vk-bits-4.5.patch
 
     patch -Np1 < ../game-patches-testing/proton-restore-unicode.patch
     patch -Np1 < ../game-patches-testing/valve-amd-ags.patch

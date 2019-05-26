@@ -269,29 +269,23 @@ index 3d3a495e300..285a1f5d1e1 100644
      if (private->lx.bits)
          xinput_caps->Gamepad.sThumbLX = (1u << (sizeof(xinput_caps->Gamepad.sThumbLX) + 1)) - 1;
      else
-@@ -435,13 +434,18 @@ void HID_update_state(xinput_controller* device)
+@@ -434,13 +434,11 @@ void HID_update_state(xinput_controller* device)
                                      private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
          device->state.Gamepad.sThumbRY = -scale_short(value, &private->ry) - 1;
  
 -    if(HidP_GetScaledUsageValue(HidP_Input, HID_USAGE_PAGE_GENERIC, 0, HID_USAGE_GENERIC_RZ, &value,
 -                                    private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
 -        device->state.Gamepad.bRightTrigger = scale_byte(value, &private->rtrigger);
-+    /* Wine-specific hack: Windows HID mangles trigger values irretrievably, so
-+     * we instead encode them in a different format in winebus. We use that
-+     * format here. We should be using WineBus to talk directly to the
-+     * controller's USB device so they can be correctly mangled in HID. */
- 
+-
      if(HidP_GetScaledUsageValue(HidP_Input, HID_USAGE_PAGE_GENERIC, 0, HID_USAGE_GENERIC_Z, &value,
                                      private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
--        device->state.Gamepad.bLeftTrigger = scale_byte(value, &private->ltrigger);
-+    {
-+        device->state.Gamepad.bLeftTrigger = (value >> 8) & 0xFF;//scale_byte(value, &private->ltrigger);
-+        device->state.Gamepad.bRightTrigger = value & 0xFF;//scale_byte(value, &private->rtrigger);
-+    }
+         device->state.Gamepad.bLeftTrigger = scale_byte(value, &private->ltrigger);
++        device->state.Gamepad.bRightTrigger = scale_byte(value, &private->triggers);
 +
      LeaveCriticalSection(&private->crit);
  }
  
+
 From 60641dd66b50d5b12e32463597319b9e1aaf60c2 Mon Sep 17 00:00:00 2001
 From: Andrew Eikum <aeikum@codeweavers.com>
 Date: Tue, 30 Apr 2019 11:20:26 -0500
@@ -429,7 +423,7 @@ index 08aae159f22..1a26307f05f 100644
      ext->poll_interval = DEFAULT_POLL_INTERVAL;
  
 diff --git a/dlls/winebus.sys/bus.h b/dlls/winebus.sys/bus.h
-index df39fb9ce7..4607f396a6 100644
+index 16e9bf7d540..673cb2953ce 100644
 --- a/dlls/winebus.sys/bus.h
 +++ b/dlls/winebus.sys/bus.h
 @@ -44,7 +44,7 @@ void *get_platform_private(DEVICE_OBJECT *device) DECLSPEC_HIDDEN;
@@ -442,10 +436,10 @@ index df39fb9ce7..4607f396a6 100644
  void bus_remove_hid_device(DEVICE_OBJECT *device) DECLSPEC_HIDDEN;
  NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp) DECLSPEC_HIDDEN;
 diff --git a/dlls/winebus.sys/bus_iohid.c b/dlls/winebus.sys/bus_iohid.c
-index 9b7cc35faa..cf4c8824b5 100644
+index 95077ac0be2..bd8986f2d4c 100644
 --- a/dlls/winebus.sys/bus_iohid.c
 +++ b/dlls/winebus.sys/bus_iohid.c
-@@ -350,7 +350,7 @@ static void handle_DeviceMatchingCallback(void *context, IOReturn result, void *
+@@ -344,7 +344,7 @@ static void handle_DeviceMatchingCallback(void *context, IOReturn result, void *
  
      device = bus_create_hid_device(iohid_driver_obj, busidW, vid, pid, input,
              version, uid, str?serial_string:NULL, is_gamepad, &GUID_DEVCLASS_IOHID,
@@ -551,7 +545,7 @@ index d02572da59a..4608f249c4b 100644
                id, vid, pid, version, debugstr_w(serial));
  
          axis_count = pSDL_JoystickNumAxes(joystick);
-@@ -953,7 +1045,7 @@ static void try_add_device(SDL_JoystickID index)
+@@ -978,7 +990,7 @@ static void try_add_device(SDL_JoystickID index)
  
      device = bus_create_hid_device(sdl_driver_obj, sdl_busidW, vid, pid,
              input, version, id, serial, is_xbox_gamepad, &GUID_DEVCLASS_SDL,
@@ -613,10 +607,10 @@ index d02572da59a..4608f249c4b 100644
          LOAD_FUNCPTR(SDL_JoystickGetGUID);
          LOAD_FUNCPTR(SDL_JoystickGetGUIDString);
 diff --git a/dlls/winebus.sys/bus_udev.c b/dlls/winebus.sys/bus_udev.c
-index a37f7bda87..26a7742bab 100644
+index c1b93d2bfd7..72b17179e64 100644
 --- a/dlls/winebus.sys/bus_udev.c
 +++ b/dlls/winebus.sys/bus_udev.c
-@@ -1215,13 +1215,13 @@ static void try_add_device(struct udev_device *dev)
+@@ -1203,13 +1203,13 @@ static void try_add_device(struct udev_device *dev)
      if (strcmp(subsystem, "hidraw") == 0)
      {
          device = bus_create_hid_device(udev_driver_obj, hidraw_busidW, vid, pid, input, version, 0, serial, is_gamepad,
@@ -645,7 +639,7 @@ index 299cec5034d..678de08b238 100644
      WCHAR *serial;
      const WCHAR *busid;  /* Expected to be a static constant */
  
-@@ -210,7 +210,8 @@ static WCHAR *get_compatible_ids(DEVICE_OBJECT *device)
+@@ -198,7 +198,8 @@ static WCHAR *get_compatible_ids(DEVICE_OBJECT *device)
  
  DEVICE_OBJECT *bus_create_hid_device(DRIVER_OBJECT *driver, const WCHAR *busidW, WORD vid, WORD pid,
                                       WORD input, DWORD version, DWORD uid, const WCHAR *serialW, BOOL is_gamepad,
@@ -879,5 +873,86 @@ index 139bd4fa6ea..9636e46b3b1 100644
              case 10: device->state.Gamepad.wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB; break;
 +            case 11: device->state.Gamepad.wButtons |= XINPUT_GAMEPAD_GUIDE; break;
          }
+     }
+ 
+@@ -434,10 +434,14 @@ void HID_update_state(xinput_controller* device)
+                                     private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
+         device->state.Gamepad.sThumbRY = -scale_short(value, &private->ry) - 1;
+ 
++    /* Wine-specific hack: Windows HID mangles trigger values irretrievably, so
++     * we instead encode them in a different format in winebus. We use that
++     * format here. We should be using WineBus to talk directly to the
++     * controller's USB device so they can be correctly mangled in HID. */
+     if(HidP_GetScaledUsageValue(HidP_Input, HID_USAGE_PAGE_GENERIC, 0, HID_USAGE_GENERIC_Z, &value,
+                                     private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
+-        device->state.Gamepad.bLeftTrigger = scale_byte(value, &private->ltrigger);
+-        device->state.Gamepad.bRightTrigger = scale_byte(value, &private->triggers);
++        device->state.Gamepad.bLeftTrigger = (value >> 8) & 0xFF;//scale_byte(value, &private->ltrigger);
++        device->state.Gamepad.bRightTrigger = value & 0xFF;//scale_byte(value, &private->rtrigger);
+ 
+     LeaveCriticalSection(&private->crit);
+ }
+
+From 9ea2c9c69bdcb970c6828b5375ca0796b96f862a Mon Sep 17 00:00:00 2001
+From: Alexey Prokhin <alexey@prokhin.ru>
+Date: Wed, 15 May 2019 00:04:58 +0300
+Subject: [PATCH] dinput: return fake DIPROP_GUIDANDPATH property for SDL
+ devices
+
+Treaks some games such as AC Unity, AC Rouge, Far Cry 5 into exclusively using xinput for gamepads.
+---
+ dlls/dinput/joystick_sdl.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/dlls/dinput/joystick_sdl.c b/dlls/dinput/joystick_sdl.c
+index cd26e1b2df7..50a09ac1d3a 100644
+--- a/dlls/dinput/joystick_sdl.c
++++ b/dlls/dinput/joystick_sdl.c
+@@ -70,6 +70,7 @@ struct SDLDev {
+     WORD vendor_id;
+     WORD product_id;
+     CHAR *name;
++    BOOL is_xbox_gamepad;
+ 
+     BOOL has_ff, is_joystick;
+     int autocenter;
+@@ -180,6 +181,11 @@ static void find_sdldevs(void)
+                 type == SDL_JOYSTICK_TYPE_WHEEL ||
+                 type == SDL_JOYSTICK_TYPE_FLIGHT_STICK ||
+                 type == SDL_JOYSTICK_TYPE_THROTTLE;
++
++            if (SDL_IsGameController(i))
++                sdldev.is_xbox_gamepad = TRUE;
++            else
++                sdldev.is_xbox_gamepad  = SDL_JoystickNumAxes(device) == 6 && SDL_JoystickNumButtons(device) >= 14;
+         }
+ 
+         if (!have_sdldevs)
+@@ -648,6 +654,26 @@ static HRESULT WINAPI JoystickWImpl_GetProperty(LPDIRECTINPUTDEVICE8W iface, REF
+             break;
+         }
+ 
++        case (DWORD_PTR) DIPROP_GUIDANDPATH:
++        {
++            static const WCHAR formatW[] =  {'\\','\\','?','\\','H','I','D','#','V','I','D','_','%','0','4', 'x','&',
++                                             'P','I','D','_','%','0','4','x','&', '%','s','_','%','i',0};
++            static const WCHAR imW[] = {'I','M',0};
++            static const WCHAR igW[] = {'I','G',0};
++
++            LPDIPROPGUIDANDPATH pd = (LPDIPROPGUIDANDPATH)pdiph;
++
++            if (!This->sdldev->product_id || !This->sdldev->vendor_id)
++                return DIERR_UNSUPPORTED;
++
++            pd->guidClass = This->generic.base.guid;
++            sprintfW(pd->wszPath, formatW, This->sdldev->vendor_id, This->sdldev->product_id,
++                     This->sdldev->is_xbox_gamepad ? igW : imW, This->sdldev->id);
++
++            TRACE("DIPROP_GUIDANDPATH(%s, %s): returning fake path\n", debugstr_guid(&pd->guidClass), debugstr_w(pd->wszPath));
++            break;
++        }
++
+     default:
+         return JoystickWGenericImpl_GetProperty(iface, rguid, pdiph);
      }
  

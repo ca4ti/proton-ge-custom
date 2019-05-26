@@ -68,7 +68,7 @@
     patch -Np1 < ../game-patches-testing/use_clock_monotonic.patch
     patch -Np1 < ../game-patches-testing/LAA-staging.patch
     patch -Np1 < ../game-patches-testing/proton-sdl-joystick.patch
-    patch -Np1 < ../game-patches-testing/valve-proton-winebus.patch
+    patch -Np1 < ../game-patches-testing/proton-gamepad-additions.patch
 
     #this is necessary for vrclient
     patch -Np1 < ../game-patches-testing/valve-wined3d-d3d11.patch

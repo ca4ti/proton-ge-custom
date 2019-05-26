@@ -3,11 +3,14 @@
 
     #WINE SYSTEM PERFORMANCE PATCHES
     cd wine
-    #git reset --hard HEAD
-    #git clean -xdf
+    #revert bison check for proton
+    git revert --no-commit a4c93936c9493f7619e1877b522eeb809a390dfe
+
+    git reset --hard HEAD
+    git clean -xdf
 
     #echo "Applying wine-staging patches..."
-    #../wine-staging/patches/patchinstall.sh DESTDIR="." --all -W xaudio2-revert -W xaudio2_7-CreateFX-FXEcho -W xaudio2_7-WMA_support -W xaudio2_CommitChanges -W winex11.drv-mouse-coorrds
+    ../wine-staging/patches/patchinstall.sh DESTDIR="." --all -W xaudio2-revert -W xaudio2_7-CreateFX-FXEcho -W xaudio2_7-WMA_support -W xaudio2_CommitChanges -W winex11.drv-mouse-coorrds
 
     #WINE GAME SPECIFIC PATCHES
 

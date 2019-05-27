@@ -85,7 +85,7 @@ SELECT_DOCKER_IMAGE :=
 # If we're using containers to sub-invoke the various builds, jobserver won't work, have some silly auto-jobs
 # controllable by SUBMAKE_JOBS.  Not ideal.
 ifneq ($(CONTAINER_SHELL32)$(CONTAINER_SHELL64),)
-	SUBMAKE_JOBS ?= 24
+	SUBMAKE_JOBS ?= 36
 	MAKE := make -j$(SUBMAKE_JOBS)
 endif
 
@@ -363,7 +363,7 @@ $(DIST_FONTS): fonts
 ALL_TARGETS += dist
 GOAL_TARGETS += dist
 
-dist: $(DIST_TARGETS) ffmpeg wine vrclient lsteamclient steam dxvk | $(DST_DIR)
+dist: $(DIST_TARGETS) wine vrclient lsteamclient steam dxvk | $(DST_DIR)
 	echo `date '+%s'` `GIT_DIR=$(abspath $(SRCDIR)/.git) git describe --tags` > $(DIST_VERSION)
 	cp $(DIST_VERSION) $(DST_BASE)/
 	rm -rf $(abspath $(DIST_PREFIX)) && \
@@ -516,7 +516,10 @@ endif # ifeq ($(WITH_FFMPEG),1)
 ## FAudio
 ##
 
-FAUDIO_CMAKE_FLAGS = -DCMAKE_BUILD_TYPE=Release -DFORCE_ENABLE_DEBUGCONFIGURATION=ON -DLOG_ASSERTIONS=ON -DCMAKE_INSTALL_LIBDIR="lib" -DXNASONG=OFF -DFFMPEG=ON
+FAUDIO_CMAKE_FLAGS = -DCMAKE_BUILD_TYPE=Release -DFORCE_ENABLE_DEBUGCONFIGURATION=ON -DLOG_ASSERTIONS=ON -DCMAKE_INSTALL_LIBDIR="lib" -DXNASONG=OFF
+ifeq ($(WITH_FFMPEG),1)
+FAUDIO_CMAKE_FLAGS += -DFFMPEG=ON
+endif # ifeq ($(WITH_FFMPEG),1)
 
 FAUDIO_TARGETS = faudio faudio32 faudio64
 
@@ -532,6 +535,7 @@ FAUDIO_CONFIGURE_FILES64 := $(FAUDIO_OBJ64)/Makefile
 
 $(FAUDIO_CONFIGURE_FILES32): SHELL = $(CONTAINER_SHELL32)
 $(FAUDIO_CONFIGURE_FILES32): $(FAUDIO)/CMakeLists.txt $(MAKEFILE_DEP) $(CMAKE_BIN32) | $(FAUDIO_OBJ32)
+
 	cd $(dir $@) && \
 		../$(CMAKE_BIN32) $(abspath $(FAUDIO)) \
 			-DCMAKE_INSTALL_PREFIX="$(abspath $(TOOLS_DIR32))" \
@@ -541,11 +545,13 @@ $(FAUDIO_CONFIGURE_FILES32): $(FAUDIO)/CMakeLists.txt $(MAKEFILE_DEP) $(CMAKE_BI
 
 $(FAUDIO_CONFIGURE_FILES64): SHELL = $(CONTAINER_SHELL64)
 $(FAUDIO_CONFIGURE_FILES64): $(FAUDIO)/CMakeLists.txt $(MAKEFILE_DEP) $(CMAKE_BIN64) | $(FAUDIO_OBJ64)
+
 	cd $(dir $@) && \
 		../$(CMAKE_BIN64) $(abspath $(FAUDIO)) \
 			-DCMAKE_INSTALL_PREFIX="$(abspath $(TOOLS_DIR64))" \
 			$(FAUDIO_CMAKE_FLAGS) \
 			-DFFmpeg_INCLUDE_DIR="$(abspath $(TOOLS_DIR64))/include"
+			
 
 faudio32: SHELL = $(CONTAINER_SHELL32)
 faudio32: $(FAUDIO_CONFIGURE_FILES32)
@@ -562,8 +568,6 @@ faudio64: $(FAUDIO_CONFIGURE_FILES64)
 	mkdir -p $(DST_DIR)/lib64
 	cp -a $(TOOLS_DIR64)/lib/libFAudio* $(DST_DIR)/lib64/
 	[ x"$(STRIP)" = x ] || $(STRIP) $(DST_DIR)/lib64/libFAudio.so
-
-
 
 ##
 ## lsteamclient
@@ -687,7 +691,7 @@ $(STEAMEXE_CONFIGURE_FILES): $(STEAMEXE_SYN) $(MAKEFILE_DEP) | $(STEAMEXE_OBJ) $
 		cp ../$(STEAMEXE_SYN)/Makefile . && \
 		echo >> ./Makefile 'SRCDIR := ../$(STEAMEXE_SYN)' && \
 		echo >> ./Makefile 'vpath % $$(SRCDIR)' && \
-		echo >> ./Makefile 'steam_exe_LDFLAGS := -m32 -fpermissive -lsteam_api $$(steam_exe_LDFLAGS)'
+		echo >> ./Makefile 'steam_exe_LDFLAGS := -m32 -lsteam_api $$(steam_exe_LDFLAGS)'
 
 ## steam goals
 STEAMEXE_TARGETS = steam steam_configure
@@ -701,7 +705,7 @@ steam_configure: $(STEAMEXE_CONFIGURE_FILES)
 
 steam: SHELL = $(CONTAINER_SHELL32)
 steam: $(STEAMEXE_CONFIGURE_FILES) | $(WINE_BUILDTOOLS32) $(filter $(MAKECMDGOALS),wine64 wine32 wine)
-	+env PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" LDFLAGS="-m32 -fpermissive" CXXFLAGS="-m32 -fpermissive -Wno-attributes $(COMMON_FLAGS) -g" CFLAGS="-m32 -fpermissive $(COMMON_FLAGS) -g" \
+	+env PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" LDFLAGS="-m32" CXXFLAGS="-m32 -Wno-attributes $(COMMON_FLAGS) -g" CFLAGS="-m32 $(COMMON_FLAGS) -g" \
 		$(MAKE) -C $(STEAMEXE_OBJ)
 	[ x"$(STRIP)" = x ] || $(STRIP) $(STEAMEXE_OBJ)/steam.exe.so
 	mkdir -pv $(DST_DIR)/lib/wine/
@@ -985,9 +989,9 @@ $(DXVK_CONFIGURE_FILES64): $(MAKEFILE_DEP) $(DXVK)/build-win64.txt | $(DXVK_OBJ6
 	mkdir -p "$(abspath $(DXVK_OBJ64))/new_includes" && \
 	cp $(abspath $(TOOLS_DIR64))/include/wine/windows/dxgi*.h "$(abspath $(DXVK_OBJ64))/new_includes" && \
 	cd "$(abspath $(DXVK))" && \
-	sed -e "s|@PROTON_C_ARGS@|'-I$(abspath $(DXVK_OBJ64))/new_includes'|" < build-win64.txt > proton-build-win64.txt && \
+	sed -e "s|@PROTON_C_ARGS@|'-I$(abspath $(DXVK_OBJ64))/new_includes'|" < build-win64.txt > "$(abspath $(DXVK_OBJ64))/proton-build-win64.txt" && \
 	PATH="$(abspath $(SRCDIR))/glslang/bin/:$(PATH)" \
-		meson --prefix="$(abspath $(DXVK_OBJ64))" --cross-file proton-build-win64.txt --strip --buildtype=release "$(abspath $(DXVK_OBJ64))"
+		meson --prefix="$(abspath $(DXVK_OBJ64))" --cross-file "$(abspath $(DXVK_OBJ64))/proton-build-win64.txt" --strip --buildtype=release "$(abspath $(DXVK_OBJ64))"
 
 # 32-bit configure.  Remove coredata file if already configured (due to e.g. makefile changing)
 #   the sed junk is to work around meson not supporting command line args for --cross-file builds
@@ -1000,9 +1004,9 @@ $(DXVK_CONFIGURE_FILES32): $(MAKEFILE_DEP) $(DXVK)/build-win32.txt | $(DXVK_OBJ3
 	mkdir -p "$(abspath $(DXVK_OBJ32))/new_includes" && \
 	cp $(abspath $(TOOLS_DIR32))/include/wine/windows/dxgi*.h "$(abspath $(DXVK_OBJ32))/new_includes" && \
 	cd "$(abspath $(DXVK))" && \
-	sed -e "s|@PROTON_C_ARGS@|'-I$(abspath $(DXVK_OBJ32))/new_includes'|" < build-win32.txt > proton-build-win32.txt && \
+	sed -e "s|@PROTON_C_ARGS@|'-I$(abspath $(DXVK_OBJ32))/new_includes'|" < build-win32.txt > "$(abspath $(DXVK_OBJ32))/proton-build-win32.txt" && \
 	PATH="$(abspath $(SRCDIR))/glslang/bin/:$(PATH)" \
-		meson --prefix="$(abspath $(DXVK_OBJ32))" --cross-file proton-build-win32.txt --strip --buildtype=release "$(abspath $(DXVK_OBJ32))"
+		meson --prefix="$(abspath $(DXVK_OBJ32))" --cross-file "$(abspath $(DXVK_OBJ32))/proton-build-win32.txt" --strip --buildtype=release "$(abspath $(DXVK_OBJ32))"
 
 ## dxvk goals
 DXVK_TARGETS = dxvk dxvk_configure dxvk32 dxvk64 dxvk_configure32 dxvk_configure64

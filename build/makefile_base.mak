@@ -85,7 +85,7 @@ SELECT_DOCKER_IMAGE :=
 # If we're using containers to sub-invoke the various builds, jobserver won't work, have some silly auto-jobs
 # controllable by SUBMAKE_JOBS.  Not ideal.
 ifneq ($(CONTAINER_SHELL32)$(CONTAINER_SHELL64),)
-	SUBMAKE_JOBS ?= 36
+	SUBMAKE_JOBS ?= 24
 	MAKE := make -j$(SUBMAKE_JOBS)
 endif
 
@@ -516,10 +516,8 @@ endif # ifeq ($(WITH_FFMPEG),1)
 ## FAudio
 ##
 
-FAUDIO_CMAKE_FLAGS = -DCMAKE_BUILD_TYPE=Release -DFORCE_ENABLE_DEBUGCONFIGURATION=ON -DLOG_ASSERTIONS=ON -DCMAKE_INSTALL_LIBDIR="lib" -DXNASONG=OFF
-ifeq ($(WITH_FFMPEG),1)
-FAUDIO_CMAKE_FLAGS += -DFFMPEG=ON
-endif # ifeq ($(WITH_FFMPEG),1)
+FAUDIO_CMAKE_FLAGS = -DCMAKE_BUILD_TYPE=Release -DFORCE_ENABLE_DEBUGCONFIGURATION=ON -DLOG_ASSERTIONS=ON -DCMAKE_INSTALL_LIBDIR="lib" -DXNASONG=OFF -DFFMPEG=ON
+
 
 FAUDIO_TARGETS = faudio faudio32 faudio64
 
@@ -691,7 +689,7 @@ $(STEAMEXE_CONFIGURE_FILES): $(STEAMEXE_SYN) $(MAKEFILE_DEP) | $(STEAMEXE_OBJ) $
 		cp ../$(STEAMEXE_SYN)/Makefile . && \
 		echo >> ./Makefile 'SRCDIR := ../$(STEAMEXE_SYN)' && \
 		echo >> ./Makefile 'vpath % $$(SRCDIR)' && \
-		echo >> ./Makefile 'steam_exe_LDFLAGS := -m32 -lsteam_api $$(steam_exe_LDFLAGS)'
+		echo >> ./Makefile 'steam_exe_LDFLAGS := -m32 -fpermissive -lsteam_api $$(steam_exe_LDFLAGS)'
 
 ## steam goals
 STEAMEXE_TARGETS = steam steam_configure
@@ -705,7 +703,7 @@ steam_configure: $(STEAMEXE_CONFIGURE_FILES)
 
 steam: SHELL = $(CONTAINER_SHELL32)
 steam: $(STEAMEXE_CONFIGURE_FILES) | $(WINE_BUILDTOOLS32) $(filter $(MAKECMDGOALS),wine64 wine32 wine)
-	+env PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" LDFLAGS="-m32" CXXFLAGS="-m32 -Wno-attributes $(COMMON_FLAGS) -g" CFLAGS="-m32 $(COMMON_FLAGS) -g" \
+        +env PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" LDFLAGS="-m32 -fpermissive" CXXFLAGS="-m32 -fpermissive -Wno-attributes $(COMMON_FLAGS) -g" CFLAGS="-m32 -fpermissive $(COMMON_FLAGS) -g" \
 		$(MAKE) -C $(STEAMEXE_OBJ)
 	[ x"$(STRIP)" = x ] || $(STRIP) $(STEAMEXE_OBJ)/steam.exe.so
 	mkdir -pv $(DST_DIR)/lib/wine/

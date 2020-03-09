@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <limits.h>
 #include <stdint.h>
+#include <fcntl.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -407,6 +408,17 @@ void *create_win_interface(const char *name, void *linux_side)
 
     if (!linux_side)
         return NULL;
+
+    int fd = open ("/dev/input/js0", O_RDONLY);
+
+    if(fd < 0)
+    {
+        if(!strcmp(name,"SteamController007") || !strcmp(name,"SteamInput001"))
+        {
+            TRACE("No input devices detected, disabling: %s\n", name);
+            return NULL;
+        }
+    }
 
     EnterCriticalSection(&steamclient_cs);
 

@@ -4,7 +4,8 @@
 #include <dlfcn.h>
 #include <limits.h>
 #include <stdint.h>
-#include <fcntl.h>
+#include <dirent.h>
+#include <string.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -409,11 +410,27 @@ void *create_win_interface(const char *name, void *linux_side)
     if (!linux_side)
         return NULL;
 
-    int fd = open ("/dev/input/js0", O_RDONLY);
 
-    if(fd < 0)
+    if(!strcmp(name,"SteamController007") || !strcmp(name,"SteamInput001"))
     {
-        if(!strcmp(name,"SteamController007") || !strcmp(name,"SteamInput001"))
+        DIR *d;
+        struct dirent *dir;
+        d = opendir("/dev/input/by-id");
+        int js = 0;
+
+        if(d)
+        {
+            while ((dir = readdir(d)) != NULL)
+            {
+                if(strstr(dir->d_name,"joystick") || strstr(dir->d_name,"Valve_Software_Wired_Controller"))
+                {
+                    js++;
+                    break;
+                }
+            }
+            closedir(d);
+        }
+        if(js<1)
         {
             TRACE("No input devices detected, disabling: %s\n", name);
             return NULL;

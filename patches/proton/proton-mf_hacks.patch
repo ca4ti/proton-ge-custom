@@ -15,15 +15,15 @@ index 9ae7e33deeb..303553db246 100644
      {
          if (reader->async_callback)
              IMFSourceReaderCallback_Release(reader->async_callback);
--        if (reader->shutdown_on_release)
-+        if (reader->source && reader->shutdown_on_release)
+-        if (reader->flags & SOURCE_READER_SHUTDOWN_ON_RELEASE)
++        if (reader->source && reader->flags & SOURCE_READER_SHUTDOWN_ON_RELEASE)
              IMFMediaSource_Shutdown(reader->source);
          if (reader->descriptor)
              IMFPresentationDescriptor_Release(reader->descriptor);
 -        IMFMediaSource_Release(reader->source);
 +        if (reader->source)
 +            IMFMediaSource_Release(reader->source);
-
+ 
          for (i = 0; i < reader->stream_count; ++i)
          {
 From 3b1cf8d88755a420b62e0d920bd4baa16cbcd0b0 Mon Sep 17 00:00:00 2001

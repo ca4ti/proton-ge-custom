@@ -198,6 +198,10 @@ GLIB := $(SRCDIR)/glib
 GLIB_OBJ32 := ./obj-glib32
 GLIB_OBJ64 := ./obj-glib64
 
+GST_ORC := $(SRCDIR)/gst-orc
+GST_ORC_OBJ32 := ./obj-gst-orc32
+GST_ORC_OBJ64 := ./obj-gst-orc64
+
 GSTREAMER := $(SRCDIR)/gstreamer
 GSTREAMER_OBJ32 := ./obj-gstreamer32
 GSTREAMER_OBJ64 := ./obj-gstreamer64
@@ -298,6 +302,13 @@ BISON_OBJ64 := ./obj-bison64
 BISON_BIN32 := $(BISON_OBJ32)/built/bin/bison
 BISON_BIN64 := $(BISON_OBJ64)/built/bin/bison
 
+LIBFFI_VER = 3.3
+LIBFFI_TARBALL := libffi-$(LIBFFI_VER).tar.gz
+LIBFFI := $(SRCDIR)/contrib/libffi-$(LIBFFI_VER)
+LIBFFI_OBJ32 := ./obj-libffi32
+LIBFFI_OBJ64 := ./obj-libffi64
+
+
 
 FONTS := $(SRCDIR)/fonts
 FONTS_OBJ := ./obj-fonts
@@ -306,6 +317,8 @@ FONTS_OBJ := ./obj-fonts
 OBJ_DIRS := $(TOOLS_DIR32)        $(TOOLS_DIR64)        \
             $(FFMPEG_OBJ32)       $(FFMPEG_OBJ64)       \
             $(GLIB_OBJ32)         $(GLIB_OBJ64)         \
+            $(LIBFFI_OBJ32)         $(LIBFFI_OBJ64)         \
+            $(GST_ORC_OBJ32)    $(GST_ORC_OBJ64)    \
             $(GSTREAMER_OBJ32)    $(GSTREAMER_OBJ64)    \
             $(GST_BASE_OBJ32)     $(GST_BASE_OBJ64)     \
             $(GST_GOOD_OBJ32)     $(GST_GOOD_OBJ64)     \
@@ -336,11 +349,13 @@ $(OBJ_DIRS):
 .PHONY: downloads
 
 BISON_TARBALL_URL := https://ftpmirror.gnu.org/bison/$(BISON_TARBALL)
+LIBFFI_TARBALL_URL := https://sourceware.org/pub/libffi/$(LIBFFI_TARBALL)
 GECKO64_TARBALL_URL := https://dl.winehq.org/wine/wine-gecko/$(GECKO_VER)/$(GECKO64_TARBALL)
 GECKO32_TARBALL_URL := https://dl.winehq.org/wine/wine-gecko/$(GECKO_VER)/$(GECKO32_TARBALL)
 MONO_TARBALL_URL := https://github.com/madewokherd/wine-mono/releases/download/wine-mono-$(WINEMONO_VER)/$(WINEMONO_TARBALL)
 
 SHARED_BISON_TARBALL := $(SRCDIR)/../bison/$(BISON_TARBALL)
+SHARED_LIBFFI_TARBALL := $(SRCDIR)/../libffi/$(LIBFFI_TARBALL)
 SHARED_GECKO64_TARBALL := $(SRCDIR)/../gecko/$(GECKO64_TARBALL)
 SHARED_GECKO32_TARBALL := $(SRCDIR)/../gecko/$(GECKO32_TARBALL)
 SHARED_MONO_TARBALL := $(SRCDIR)/../mono/$(WINEMONO_TARBALL)
@@ -348,6 +363,10 @@ SHARED_MONO_TARBALL := $(SRCDIR)/../mono/$(WINEMONO_TARBALL)
 $(SHARED_BISON_TARBALL):
 	mkdir -p $(dir $@)
 	wget -O "$@" "$(BISON_TARBALL_URL)"
+	
+$(SHARED_LIBFFI_TARBALL):
+	mkdir -p $(dir $@)
+	wget -O "$@" "$(LIBFFI_TARBALL_URL)"
 
 $(SHARED_GECKO64_TARBALL):
 	mkdir -p $(dir $@)
@@ -361,7 +380,7 @@ $(SHARED_MONO_TARBALL):
 	mkdir -p $(dir $@)
 	wget -O "$@" "$(MONO_TARBALL_URL)"
 
-downloads: $(SHARED_BISON_TARBALL) $(SHARED_GECKO64_TARBALL) $(SHARED_GECKO32_TARBALL) $(SHARED_MONO_TARBALL)
+downloads: $(SHARED_BISON_TARBALL) $(SHARED_LIBFFI_TARBALL) $(SHARED_GECKO64_TARBALL) $(SHARED_GECKO32_TARBALL) $(SHARED_MONO_TARBALL)
 
 ##
 ## dist/install -- steps to finalize the install
@@ -487,7 +506,7 @@ $(DIST_FONTS): fonts
 ALL_TARGETS += dist
 GOAL_TARGETS += dist
 
-dist: $(DIST_TARGETS) wine gst_good gst_bad gst_ugly gst_libav vrclient lsteamclient steam dxvk | $(DST_DIR)
+dist: $(DIST_TARGETS) libffi gst_orc wine gst_good gst_bad gst_ugly gst_libav vrclient lsteamclient steam dxvk | $(DST_DIR)
 	echo `date '+%s'` `GIT_DIR=$(abspath $(SRCDIR)/.git) git describe --tags` > $(DIST_VERSION)
 	cp $(DIST_VERSION) $(DST_BASE)/
 	rm -rf $(abspath $(DIST_PREFIX)) && \
@@ -596,11 +615,11 @@ glib32: $(GLIB_CONFIGURE_FILES32)
 	cp -a $(TOOLS_DIR32)/lib/libgmodule* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/libgobject* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/libgthread* $(DST_DIR)/lib/
-
-
+	
+	
 ##
-## gstreamer
-##
+## gstreamer common meson args
+## 
 
 GST_COMMON_MESON_ARGS := \
 	-Dexamples=disabled \
@@ -611,12 +630,85 @@ GST_COMMON_MESON_ARGS := \
 	-Dgobject-cast-checks=disabled \
 	-Dglib-asserts=disabled \
 	-Dglib-checks=disabled \
-	-Dnls=disabled
+	-Dnls=disabled \
+	-Dbenchmarks=disabled
+
+##
+## gst-orc
+##
+
+GST_ORC_MESON_ARGS := \
+	-Dorc-test=disabled \
+	-Dexamples=disabled \
+	-Dtests=disabled \
+	-Dgtk_doc=disabled \
+	-Dintrospection=disabled \
+	-Dgobject-cast-checks=disabled \
+	-Dglib-asserts=disabled \
+	-Dglib-checks=disabled \
+	-Dnls=disabled \
+	-Dbenchmarks=disabled
+
+GST_ORC_CONFIGURE_FILES32 := $(GST_ORC_OBJ32)/build.ninja
+GST_ORC_CONFIGURE_FILES64 := $(GST_ORC_OBJ64)/build.ninja
+
+# 64-bit configure.  Remove coredata file if already configured (due to e.g. makefile changing)
+$(GST_ORC_CONFIGURE_FILES64): SHELL = $(CONTAINER_SHELL64)
+$(GST_ORC_CONFIGURE_FILES64): $(MAKEFILE_DEP) glib64 | $(GST_ORC_OBJ64)
+	if [ -e "$(abspath $(GST_ORC_OBJ64))"/build.ninja ]; then \
+		rm -f "$(abspath $(GST_ORC_OBJ64))"/meson-private/coredata.dat; \
+	fi
+	cd "$(abspath $(GST_ORC))" && \
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+		PKG_CONFIG_PATH=$(abspath $(TOOLS_DIR64))/lib/pkgconfig \
+		meson --prefix="$(abspath $(TOOLS_DIR64))" --libdir="lib" $(GST_ORC_MESON_ARGS) $(MESON_STRIP_ARG) "$(abspath $(GST_ORC_OBJ64))"
+
+# 32-bit configure.  Remove coredata file if already configured (due to e.g. makefile changing)
+$(GST_ORC_CONFIGURE_FILES32): SHELL = $(CONTAINER_SHELL32)
+$(GST_ORC_CONFIGURE_FILES32): $(MAKEFILE_DEP) glib32 | $(GST_ORC_OBJ32)
+	if [ -e "$(abspath $(GST_ORC_OBJ32))"/build.ninja ]; then \
+		rm -f "$(abspath $(GST_ORC_OBJ32))"/meson-private/coredata.dat; \
+	fi
+	cd "$(abspath $(GST_ORC))" && \
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+		PKG_CONFIG_PATH=$(abspath $(TOOLS_DIR32))/lib/pkgconfig \
+		meson --prefix="$(abspath $(TOOLS_DIR32))" --libdir="lib" $(GST_ORC_MESON_ARGS) $(MESON_STRIP_ARG) "$(abspath $(GST_ORC_OBJ32))"
+
+## gst-orc goals
+GST_ORC_TARGETS = gst_orc gst_orc_configure gst_orc32 gst_orc64 gst_orc_configure32 gst_orc_configure64
+
+ALL_TARGETS += $(GST_ORC_TARGETS)
+GOAL_TARGETS_LIBS += gst_orc
+
+.PHONY: $(GST_ORC_TARGETS)
+
+gst_orc_configure: $(GST_ORC_CONFIGURE_FILES32) $(GST_ORC_CONFIGURE_FILES64)
+
+gst_orc_configure64: $(GST_ORC_CONFIGURE_FILES64)
+
+gst_orc_configure32: $(GST_ORC_CONFIGURE_FILES32)
+
+gst_orc: gst_orc32 gst_orc64
+
+gst_orc64: SHELL = $(CONTAINER_SHELL64)
+gst_orc64: $(GST_ORC_CONFIGURE_FILES64)
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR64))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_ORC_OBJ64)" install
+
+gst_orc32: SHELL = $(CONTAINER_SHELL32)
+gst_orc32: $(GST_ORC_CONFIGURE_FILES32)
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR32))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_ORC_OBJ32)" install
+
+##
+## gstreamer
+##
 
 GSTREAMER_MESON_ARGS := \
 	-Dgst_parse=false \
 	-Dbenchmarks=disabled \
-	-Ddbghelp=disabled \
 	$(GST_COMMON_MESON_ARGS)
 
 GSTREAMER_CONFIGURE_FILES32 := $(GSTREAMER_OBJ32)/build.ninja
@@ -662,13 +754,17 @@ gstreamer: gstreamer32 gstreamer64
 
 gstreamer64: SHELL = $(CONTAINER_SHELL64)
 gstreamer64: $(GSTREAMER_CONFIGURE_FILES64)
-	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" ninja -C "$(GSTREAMER_OBJ64)" install
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR64))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GSTREAMER_OBJ64)" install
 	cp -a $(TOOLS_DIR64)/lib/libgst* $(DST_DIR)/lib64/ && \
 	cp -a $(TOOLS_DIR64)/lib/gstreamer-1.0 $(DST_DIR)/lib64/
 
 gstreamer32: SHELL = $(CONTAINER_SHELL32)
 gstreamer32: $(GSTREAMER_CONFIGURE_FILES32)
-	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" ninja -C "$(GSTREAMER_OBJ32)" install
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR32))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GSTREAMER_OBJ32)" install
 	cp -a $(TOOLS_DIR32)/lib/libgst* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/gstreamer-1.0 $(DST_DIR)/lib/
 
@@ -678,7 +774,28 @@ gstreamer32: $(GSTREAMER_CONFIGURE_FILES32)
 ##
 
 GST_BASE_MESON_ARGS := \
-	-D tremor=disabled \
+	-Dalsa=disabled \
+	-Daudiomixer=disabled \
+	-Daudiorate=disabled \
+	-Daudiotestsrc=disabled \
+	-Dcdparanoia=disabled \
+	-Dcompositor=disabled \
+	-Dencoding=disabled \
+	-Dgio=disabled \
+	-Dgl=disabled \
+	-Dlibvisual=disabled \
+	-Doverlaycomposition=disabled \
+	-Dpango=disabled \
+	-Drawparse=disabled \
+	-Dsubparse=disabled \
+	-Dtcp=disabled \
+	-Dtremor=disabled \
+	-Dvideorate=disabled \
+	-Dvideotestsrc=disabled \
+	-Dvolume=disabled \
+	-Dx11=disabled \
+	-Dxshm=disabled \
+	-Dxvideo=disabled \
 	$(GST_COMMON_MESON_ARGS)
 
 GST_BASE_CONFIGURE_FILES32 := $(GST_BASE_OBJ32)/build.ninja
@@ -724,13 +841,17 @@ gst_base: gst_base32 gst_base64
 
 gst_base64: SHELL = $(CONTAINER_SHELL64)
 gst_base64: $(GST_BASE_CONFIGURE_FILES64)
-	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" ninja -C "$(GST_BASE_OBJ64)" install
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR64))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_BASE_OBJ64)" install
 	cp -a $(TOOLS_DIR64)/lib/libgst* $(DST_DIR)/lib64/ && \
 	cp -a $(TOOLS_DIR64)/lib/gstreamer-1.0 $(DST_DIR)/lib64/
 
 gst_base32: SHELL = $(CONTAINER_SHELL32)
 gst_base32: $(GST_BASE_CONFIGURE_FILES32)
-	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" ninja -C "$(GST_BASE_OBJ32)" install
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR32))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_BASE_OBJ32)" install
 	cp -a $(TOOLS_DIR32)/lib/libgst* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/gstreamer-1.0 $(DST_DIR)/lib/
 
@@ -740,7 +861,53 @@ gst_base32: $(GST_BASE_CONFIGURE_FILES32)
 ##
 
 GST_GOOD_MESON_ARGS := \
+	-Daalib=disabled \
+	-Dalpha=disabled \
+	-Dapetag=disabled \
+	-Daudiofx=disabled \
+	-Dauparse=disabled \
+	-Dcairo=disabled \
+	-Dcutter=disabled \
+	-Ddebugutils=disabled \
+	-Ddtmf=disabled \
+	-Deffectv=disabled \
+	-Dequalizer=disabled \
+	-Dgdk-pixbuf=disabled \
+	-Dgtk3=disabled \
+	-Dgoom=disabled \
+	-Dgoom2k1=disabled \
+	-Dicydemux=disabled \
+	-Dimagefreeze=disabled \
+	-Dinterleave=disabled \
+	-Djack=disabled \
+	-Dlaw=disabled \
+	-Dlevel=disabled \
+	-Dlibcaca=disabled \
+	-Dmonoscope=disabled \
+	-Dmultifile=disabled \
+	-Dmultipart=disabled \
+	-Doss=disabled \
+	-Doss4=disabled \
+	-Dpng=disabled \
+	-Dpulse=disabled \
+	-Dqt5=disabled \
+	-Dreplaygain=disabled \
+	-Drtp=disabled \
+	-Drtpmanager=disabled \
+	-Drtsp=disabled \
+	-Dshapewipe=disabled \
+	-Dshout2=disabled \
+	-Dsmpte=disabled \
+	-Dsoup=disabled \
+	-Dspectrum=disabled \
+	-Dtaglib=disabled \
+	-Dudp=disabled \
 	-Dv4l2=disabled \
+	-Dvideocrop=disabled \
+	-Dvideomixer=disabled \
+	-Dwavenc=disabled \
+	-Dximagesrc=disabled \
+	-Dy4m=disabled \
 	$(GST_COMMON_MESON_ARGS)
 
 GST_GOOD_CONFIGURE_FILES32 := $(GST_GOOD_OBJ32)/build.ninja
@@ -786,13 +953,17 @@ gst_good: gst_good32 gst_good64
 
 gst_good64: SHELL = $(CONTAINER_SHELL64)
 gst_good64: $(GST_GOOD_CONFIGURE_FILES64)
-	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" ninja -C "$(GST_GOOD_OBJ64)" install
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+    LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR64))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_GOOD_OBJ64)" install
 	cp -a $(TOOLS_DIR64)/lib/libgst* $(DST_DIR)/lib64/ && \
 	cp -a $(TOOLS_DIR64)/lib/gstreamer-1.0 $(DST_DIR)/lib64/
 
 gst_good32: SHELL = $(CONTAINER_SHELL32)
 gst_good32: $(GST_GOOD_CONFIGURE_FILES32)
-	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" ninja -C "$(GST_GOOD_OBJ32)" install
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR32))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_GOOD_OBJ32)" install
 	cp -a $(TOOLS_DIR32)/lib/libgst* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/gstreamer-1.0 $(DST_DIR)/lib/
 
@@ -801,24 +972,24 @@ gst_good32: $(GST_GOOD_CONFIGURE_FILES32)
 ##
 
 GST_BAD_MESON_ARGS := \
-	-Ddirectfb=disabled \
+	-Dfbdev=disabled \
+	-Ddecklink=disabled \
+	-Dlinksys=disabled \
+	-Dstatic=disabled \
+	-Ddts=disabled \
+	-Dfaac=disabled \
+	-Dfaad=disabled \
+	-Dlibmms=disabled \
+	-Dmpeg2enc=disabled \
+	-Dmplex=disabled \
+	-Dneon=disabled \
+	-Drtmp=disabled \
 	-Dflite=disabled \
-	-Dgsm=disabled \
-	-Diqa=disabled \
-	-Dmsdk=disabled \
-	-Dnvdec=disabled \
-	-Dnvenc=disabled \
+	-Dvulkan=disabled \
+	-Dsbc=disabled \
 	-Dopencv=disabled \
-	-Dopenh264=disabled \
-	-Dopenmpt=disabled \
-	-Dopenni2=disabled \
-	-Dopensles=disabled \
-	-Dsctp=disabled \
-	-Dtinyalsa=disabled \
-	-Dvoaacenc=disabled \
 	-Dvoamrwbenc=disabled \
-	-Dwasapi=disabled \
-	-Dwpe=disabled \
+	-Dx265=disabled \
 	$(GST_COMMON_MESON_ARGS)
 
 GST_BAD_CONFIGURE_FILES32 := $(GST_BAD_OBJ32)/build.ninja
@@ -864,13 +1035,17 @@ gst_bad: gst_bad32 gst_bad64
 
 gst_bad64: SHELL = $(CONTAINER_SHELL64)
 gst_bad64: $(GST_BAD_CONFIGURE_FILES64)
-	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" ninja -C "$(GST_BAD_OBJ64)" install
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR64))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_BAD_OBJ64)" install
 	cp -a $(TOOLS_DIR64)/lib/libgst* $(DST_DIR)/lib64/ && \
 	cp -a $(TOOLS_DIR64)/lib/gstreamer-1.0 $(DST_DIR)/lib64/
 
 gst_bad32: SHELL = $(CONTAINER_SHELL32)
 gst_bad32: $(GST_BAD_CONFIGURE_FILES32)
-	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" ninja -C "$(GST_BAD_OBJ32)" install
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR32))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_BAD_OBJ32)" install
 	cp -a $(TOOLS_DIR32)/lib/libgst* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/gstreamer-1.0 $(DST_DIR)/lib/
 
@@ -879,6 +1054,11 @@ gst_bad32: $(GST_BAD_CONFIGURE_FILES32)
 ##
 
 GST_UGLY_MESON_ARGS := \
+        -Dgobject-cast-checks='disabled' \
+        -Dglib-asserts='disabled' \
+        -Dglib-checks='disabled' \
+        -Dglib-checks='disabled' \
+        -Ddoc='disabled' \
 	$(GST_COMMON_MESON_ARGS)
 
 GST_UGLY_CONFIGURE_FILES32 := $(GST_UGLY_OBJ32)/build.ninja
@@ -924,13 +1104,17 @@ gst_ugly: gst_ugly32 gst_ugly64
 
 gst_ugly64: SHELL = $(CONTAINER_SHELL64)
 gst_ugly64: $(GST_UGLY_CONFIGURE_FILES64)
-	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" ninja -C "$(GST_UGLY_OBJ64)" install
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR64))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_UGLY_OBJ64)" install
 	cp -a $(TOOLS_DIR64)/lib/libgst* $(DST_DIR)/lib64/ && \
 	cp -a $(TOOLS_DIR64)/lib/gstreamer-1.0 $(DST_DIR)/lib64/
 
 gst_ugly32: SHELL = $(CONTAINER_SHELL32)
 gst_ugly32: $(GST_UGLY_CONFIGURE_FILES32)
-	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" ninja -C "$(GST_UGLY_OBJ32)" install
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR32))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_UGLY_OBJ32)" install
 	cp -a $(TOOLS_DIR32)/lib/libgst* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/gstreamer-1.0 $(DST_DIR)/lib/
 
@@ -985,13 +1169,17 @@ gst_libav: gst_libav32 gst_libav64
 
 gst_libav64: SHELL = $(CONTAINER_SHELL64)
 gst_libav64: $(GST_LIBAV_CONFIGURE_FILES64)
-	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" ninja -C "$(GST_LIBAV_OBJ64)" install
+	PATH="$(abspath $(TOOLS_DIR64))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR64))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_LIBAV_OBJ64)" install
 	cp -a $(TOOLS_DIR64)/lib/libgst* $(DST_DIR)/lib64/ && \
 	cp -a $(TOOLS_DIR64)/lib/gstreamer-1.0 $(DST_DIR)/lib64/
 
 gst_libav32: SHELL = $(CONTAINER_SHELL32)
 gst_libav32: $(GST_LIBAV_CONFIGURE_FILES32)
-	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" ninja -C "$(GST_LIBAV_OBJ32)" install
+	PATH="$(abspath $(TOOLS_DIR32))/bin:$(PATH)" \
+	LD_LIBRARY_PATH="$(abspath $(TOOLS_DIR32))/lib:$(LD_LIBRARY_PATH)" \
+	ninja -C "$(GST_LIBAV_OBJ32)" install
 	cp -a $(TOOLS_DIR32)/lib/libgst* $(DST_DIR)/lib/ && \
 	cp -a $(TOOLS_DIR32)/lib/gstreamer-1.0 $(DST_DIR)/lib/
 
@@ -1010,25 +1198,46 @@ $(FFMPEG_CONFIGURE_FILES64): $(FFMPEG)/configure $(MAKEFILE_DEP) | $(FFMPEG_OBJ6
 		$(abspath $(FFMPEG))/configure \
 			--cc=$(CC_QUOTED) --cxx=$(CXX_QUOTED) \
 			--prefix=$(abspath $(TOOLS_DIR64)) \
-			--disable-debug \
 			--disable-static \
+			--enable-shared \
 			--disable-programs \
 			--disable-doc \
 			--disable-avdevice \
-			--enable-shared \
-			--enable-fontconfig \
-			--enable-gnutls \
-			--enable-libdrm \
-			--enable-libfreetype \
-			--enable-libgsm \
-			--enable-libjack \
-			--enable-libopus \
-			--enable-libpulse \
-			--enable-libspeex \
-			--enable-libtheora \
-			--enable-libvorbis \
-			--enable-libxcb \
-			--enable-libxml2 && \
+			--disable-swscale \
+			--disable-postproc \
+			--disable-alsa \
+			--disable-iconv \
+			--disable-libxcb_shape \
+			--disable-libxcb_shm \
+			--disable-libxcb_xfixes \
+			--disable-sdl2 \
+			--disable-xlib \
+			--disable-zlib \
+			--disable-bzlib \
+			--disable-libxcb \
+			--disable-vaapi \
+			--disable-vdpau \
+			--disable-everything \
+			--enable-parser=h264 \
+			--enable-decoder=h264 \
+			--enable-parser=bmp \
+			--enable-decoder=bmp \
+			--enable-parser=png \
+			--enable-decoder=png \
+			--enable-decoder=bink \
+			--enable-decoder=binkaudio_dct \
+			--enable-decoder=binkaudio_rdft \
+			--enable-decoder=wmv1 \
+			--enable-decoder=wmv2 \
+			--enable-decoder=wmv3 \
+			--enable-decoder=wmv3image \
+			--enable-decoder=aac \
+			--enable-decoder=wmalossless \
+			--enable-decoder=wmapro \
+			--enable-decoder=wmav1 \
+			--enable-decoder=wmav2 \
+			--enable-decoder=wmavoice \
+			--enable-decoder=adpcm_ms && \
 		[ ! -f ./Makefile ] || touch ./Makefile
 # ^ ffmpeg's configure script doesn't update the timestamp on this guy in the case of a no-op
 
@@ -1040,25 +1249,46 @@ $(FFMPEG_CONFIGURE_FILES32): $(FFMPEG)/configure $(MAKEFILE_DEP) | $(FFMPEG_OBJ3
 			--cc=$(CC_QUOTED) --cxx=$(CXX_QUOTED) \
 			--prefix=$(abspath $(TOOLS_DIR32)) \
 			--extra-cflags=$(FFMPEG_CROSS_CFLAGS) --extra-ldflags=$(FFMPEG_CROSS_LDFLAGS) \
-			--disable-debug \
 			--disable-static \
+			--enable-shared \
 			--disable-programs \
 			--disable-doc \
 			--disable-avdevice \
-			--enable-shared \
-			--enable-fontconfig \
-			--enable-gnutls \
-			--enable-libdrm \
-			--enable-libfreetype \
-			--enable-libgsm \
-			--enable-libjack \
-			--enable-libopus \
-			--enable-libpulse \
-			--enable-libspeex \
-			--enable-libtheora \
-			--enable-libvorbis \
-			--enable-libxcb \
-			--enable-libxml2 && \
+			--disable-swscale \
+			--disable-postproc \
+			--disable-alsa \
+			--disable-iconv \
+			--disable-libxcb_shape \
+			--disable-libxcb_shm \
+			--disable-libxcb_xfixes \
+			--disable-sdl2 \
+			--disable-xlib \
+			--disable-zlib \
+			--disable-bzlib \
+			--disable-libxcb \
+			--disable-vaapi \
+			--disable-vdpau \
+			--disable-everything \
+			--enable-parser=h264 \
+			--enable-decoder=h264 \
+			--enable-parser=bmp \
+			--enable-decoder=bmp \
+			--enable-parser=png \
+			--enable-decoder=png \
+			--enable-decoder=bink \
+			--enable-decoder=binkaudio_dct \
+			--enable-decoder=binkaudio_rdft \
+			--enable-decoder=wmv1 \
+			--enable-decoder=wmv2 \
+			--enable-decoder=wmv3 \
+			--enable-decoder=wmv3image \
+			--enable-decoder=aac \
+			--enable-decoder=wmalossless \
+			--enable-decoder=wmapro \
+			--enable-decoder=wmav1 \
+			--enable-decoder=wmav2 \
+			--enable-decoder=wmavoice \
+			--enable-decoder=adpcm_ms && \
 		[ ! -f ./Makefile ] || touch ./Makefile
 # ^ ffmpeg's configure script doesn't update the timestamp on this guy in the case of a no-op
 
@@ -1083,14 +1313,14 @@ ffmpeg64: $(FFMPEG_CONFIGURE_FILES64)
 	+$(MAKE) -C $(FFMPEG_OBJ64)
 	+$(MAKE) -C $(FFMPEG_OBJ64) install
 	mkdir -pv $(DST_DIR)/lib64
-	cp -a $(TOOLS_DIR64)/lib/* $(DST_DIR)/lib64
+	cp -a $(TOOLS_DIR64)/lib/{libavcodec,libavfilter,libavformat,libavutil,libswresample}* $(DST_DIR)/lib64
 
 ffmpeg32: SHELL = $(CONTAINER_SHELL32)
 ffmpeg32: $(FFMPEG_CONFIGURE_FILES32)
 	+$(MAKE) -C $(FFMPEG_OBJ32)
 	+$(MAKE) -C $(FFMPEG_OBJ32) install
 	mkdir -pv $(DST_DIR)/lib
-	cp -a $(TOOLS_DIR32)/lib/* $(DST_DIR)/lib
+	cp -a $(TOOLS_DIR32)/lib/{libavcodec,libavfilter,libavformat,libavutil,libswresample}* $(DST_DIR)/lib
 
 ##
 ## FAudio
@@ -1330,7 +1560,7 @@ $(WINE_CONFIGURE_FILES64): $(MAKEFILE_DEP) | faudio64 vkd3d64 gst_base64 $(WINE_
 			BISON=$(abspath $(BISON_BIN64)) \
 			CFLAGS="-I$(abspath $(TOOLS_DIR64))/include -g $(COMMON_FLAGS)" \
 			CXXFLAGS="-I$(abspath $(TOOLS_DIR64))/include -g $(COMMON_FLAGS) -std=c++17" \
-			LDFLAGS=-L$(abspath $(TOOLS_DIR64))/lib \
+			LDFLAGS="-L$(abspath $(TOOLS_DIR64))/lib -Wl,-rpath-link,$(abspath $(TOOLS_DIR64))/lib" \
 			PKG_CONFIG_PATH=$(abspath $(TOOLS_DIR64))/lib/pkgconfig \
 			CC=$(CC_QUOTED) \
 			CXX=$(CXX_QUOTED)
@@ -1347,7 +1577,7 @@ $(WINE_CONFIGURE_FILES32): $(MAKEFILE_DEP) | faudio32 vkd3d32 gst_base32 $(WINE_
 			BISON=$(abspath $(BISON_BIN32)) \
 			CFLAGS="-I$(abspath $(TOOLS_DIR32))/include -g $(COMMON_FLAGS)" \
 			CXXFLAGS="-I$(abspath $(TOOLS_DIR32))/include -g $(COMMON_FLAGS) -std=c++17" \
-			LDFLAGS=-L$(abspath $(TOOLS_DIR32))/lib \
+			LDFLAGS="-L$(abspath $(TOOLS_DIR32))/lib -Wl,-rpath-link,$(abspath $(TOOLS_DIR32))/lib" \
 			PKG_CONFIG_PATH=$(abspath $(TOOLS_DIR32))/lib/pkgconfig \
 			CC=$(CC_QUOTED) \
 			CXX=$(CXX_QUOTED)
@@ -1624,6 +1854,69 @@ bison32-intermediate: $(BISON_CONFIGURE_FILES32) $(filter $(MAKECMDGOALS),bison3
 	+$(MAKE) -C $(BISON_OBJ32)
 	+$(MAKE) -C $(BISON_OBJ32) install
 	touch $(BISON_BIN32)
+	
+##
+## libffi
+##
+
+$(LIBFFI):
+	if [ -e "$(SRCDIR)/../libffi/$(LIBFFI_TARBALL)" ]; then \
+		mkdir -p $(dir $@); \
+		tar -xf "$(SRCDIR)/../libffi/$(LIBFFI_TARBALL)" -C "$(dir $@)"; \
+	else \
+		mkdir -p $(SRCDIR)/contrib/; \
+		if [ ! -e "$(SRCDIR)/contrib/$(LIBFFI_TARBALL)" ]; then \
+			echo ">>>> Downloading libffi. To avoid this in future, put it here: $(SRCDIR)/../libffi/$(LIBFFI_TARBALL)"; \
+			wget -O "$(SRCDIR)/contrib/$(LIBFFI_TARBALL)" "$(LIBFFI_TARBALL_URL)"; \
+		fi; \
+		tar -xf "$(SRCDIR)/contrib/$(LIBFFI_TARBALL)" -C "$(dir $@)"; \
+	fi
+
+LIBFFI_CONFIGURE_FILES32 := $(LIBFFI_OBJ32)/Makefile
+LIBFFI_CONFIGURE_FILES64 := $(LIBFFI_OBJ64)/Makefile
+
+# 64bit-configure
+$(LIBFFI_CONFIGURE_FILES64): SHELL = $(CONTAINER_SHELL64)
+$(LIBFFI_CONFIGURE_FILES64): $(MAKEFILE_DEP) $(LIBFFI) | $(LIBFFI_OBJ64)
+	cd "$(LIBFFI_OBJ64)" && \
+		../$(LIBFFI)/configure --prefix=$(abspath $(TOOLS_DIR64)) --disable-static
+
+# 32-bit configure
+$(LIBFFI_CONFIGURE_FILES32): SHELL = $(CONTAINER_SHELL32)
+$(LIBFFI_CONFIGURE_FILES32): $(MAKEFILE_DEP) $(LIBFFI) | $(LIBFFI_OBJ32)
+	cd "$(LIBFFI_OBJ32)" && \
+		../$(LIBFFI)/configure --prefix=$(abspath $(TOOLS_DIR32)) --disable-static
+
+## libffi goals
+LIBFFI_TARGETS = libffi libffi_configure libffi32 libffi64 libffi_configure32 libffi_configure64
+
+ALL_TARGETS += $(LIBFFI_TARGETS)
+GOAL_TARGETS_LIBS += libffi
+
+.PHONY: $(LIBFFI_TARGETS)
+
+libffi_configure: $(LIBFFI_CONFIGURE_FILES32) $(LIBFFI_CONFIGURE_FILES64)
+
+libffi_configure64: $(LIBFFI_CONFIGURE_FILES64)
+
+libffi_configure32: $(LIBFFI_CONFIGURE_FILES32)
+
+libffi: libffi32 libffi64
+
+libffi64: SHELL = $(CONTAINER_SHELL64)
+libffi64: $(LIBFFI_CONFIGURE_FILES64)
+	+$(MAKE) -C $(LIBFFI_OBJ64)
+	+$(MAKE) -C $(LIBFFI_OBJ64) install
+	mkdir -pv $(DST_DIR)/lib64
+	cp -a $(TOOLS_DIR64)/lib/libffi* $(DST_DIR)/lib64
+
+libffi32: SHELL = $(CONTAINER_SHELL32)
+libffi32: $(LIBFFI_CONFIGURE_FILES32)
+	+$(MAKE) -C $(LIBFFI_OBJ32)
+	+$(MAKE) -C $(LIBFFI_OBJ32) install
+	mkdir -pv $(DST_DIR)/lib
+	cp -a $(TOOLS_DIR32)/lib/libffi* $(DST_DIR)/lib
+
 
 ##
 ## dxvk

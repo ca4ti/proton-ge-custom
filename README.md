@@ -139,7 +139,7 @@ git clone --recurse-submodules http://github.com/gloriouseggroll/proton-ge-custo
 5. Apply all of the patches in patches/ by running:
 
 ```
-./patches/protonprep-nofshack.sh &> patchlog.txt
+./patches/protonprep-nofshack-5.9.sh &> patchlog.txt
 ```
 
 in the main proton-ge-custom directory. Open `patchlog.txt` and search for "fail" to make sure no patch failures occured. An easy way to do this is like so:

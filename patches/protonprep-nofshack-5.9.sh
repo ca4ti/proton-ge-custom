@@ -99,6 +99,7 @@
     
     
     echo "5.10 backports"
+    patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/1ae10889647c1c84c36660749508a42e99e64a5e.patch
     patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/25e9e91c3a4f6c1c134d96a5c11517178e31f111.patch
     patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/4ed26b63ca0305ba750c4f38002cf1eb674f688c.patch
     patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/ea9b507380b4415cf9edd3643d9bcea7ab934fbd.patch

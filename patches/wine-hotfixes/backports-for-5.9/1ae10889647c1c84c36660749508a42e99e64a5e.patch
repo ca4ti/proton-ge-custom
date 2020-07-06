@@ -1,0 +1,202 @@
+From 1ae10889647c1c84c36660749508a42e99e64a5e Mon Sep 17 00:00:00 2001
+From: Alexandre Julliard <julliard@winehq.org>
+Date: Mon, 25 May 2020 20:25:50 +0200
+Subject: [PATCH] server: Update shared user data timestamps on every request.
+
+Signed-off-by: Alexandre Julliard <julliard@winehq.org>
+---
+ server/fd.c      | 50 ++++++++++++++++++++++++++++++++++++----
+ server/file.h    |  1 +
+ server/mapping.c | 59 ++++--------------------------------------------
+ 3 files changed, 51 insertions(+), 59 deletions(-)
+
+diff --git a/server/fd.c b/server/fd.c
+index 39fb419f25..06d1d81bdb 100644
+--- a/server/fd.c
++++ b/server/fd.c
+@@ -104,6 +104,7 @@
+ 
+ #include "winternl.h"
+ #include "winioctl.h"
++#include "ddk/wdm.h"
+ 
+ #if defined(HAVE_SYS_EPOLL_H) && defined(HAVE_EPOLL_CREATE)
+ # include <sys/epoll.h>
+@@ -374,6 +375,46 @@ static struct list rel_timeout_list = LIST_INIT(rel_timeout_list); /* sorted rel
+ timeout_t current_time;
+ timeout_t monotonic_time;
+ 
++struct _KUSER_SHARED_DATA *user_shared_data = NULL;
++static const int user_shared_data_timeout = 16;
++
++static void set_user_shared_data_time(void)
++{
++    timeout_t tick_count = monotonic_time / 10000;
++
++    /* on X86 there should be total store order guarantees, so volatile is enough
++     * to ensure the stores aren't reordered by the compiler, and then they will
++     * always be seen in-order from other CPUs. On other archs, we need atomic
++     * intrinsics to guarantee that. */
++#if defined(__i386__) || defined(__x86_64__)
++    user_shared_data->SystemTime.High2Time = current_time >> 32;
++    user_shared_data->SystemTime.LowPart   = current_time;
++    user_shared_data->SystemTime.High1Time = current_time >> 32;
++
++    user_shared_data->InterruptTime.High2Time = monotonic_time >> 32;
++    user_shared_data->InterruptTime.LowPart   = monotonic_time;
++    user_shared_data->InterruptTime.High1Time = monotonic_time >> 32;
++
++    user_shared_data->TickCount.High2Time = tick_count >> 32;
++    user_shared_data->TickCount.LowPart   = tick_count;
++    user_shared_data->TickCount.High1Time = tick_count >> 32;
++    *(volatile ULONG *)&user_shared_data->TickCountLowDeprecated = tick_count;
++#else
++    __atomic_store_n(&user_shared_data->SystemTime.High2Time, current_time >> 32, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&user_shared_data->SystemTime.LowPart, current_time, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&user_shared_data->SystemTime.High1Time, current_time >> 32, __ATOMIC_SEQ_CST);
++
++    __atomic_store_n(&user_shared_data->InterruptTime.High2Time, monotonic_time >> 32, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&user_shared_data->InterruptTime.LowPart, monotonic_time, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&user_shared_data->InterruptTime.High1Time, monotonic_time >> 32, __ATOMIC_SEQ_CST);
++
++    __atomic_store_n(&user_shared_data->TickCount.High2Time, tick_count >> 32, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&user_shared_data->TickCount.LowPart, tick_count, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&user_shared_data->TickCount.High1Time, tick_count >> 32, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&user_shared_data->TickCountLowDeprecated, tick_count, __ATOMIC_SEQ_CST);
++#endif
++}
++
+ void set_current_time(void)
+ {
+     static const timeout_t ticks_1601_to_1970 = (timeout_t)86400 * (369 * 365 + 89) * TICKS_PER_SEC;
+@@ -381,6 +422,7 @@ void set_current_time(void)
+     gettimeofday( &now, NULL );
+     current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970;
+     monotonic_time = monotonic_counter();
++    if (user_shared_data) set_user_shared_data_time();
+ }
+ 
+ /* add a timeout user */
+@@ -865,10 +907,11 @@ static void remove_poll_user( struct fd *fd, int user )
+ /* process pending timeouts and return the time until the next timeout, in milliseconds */
+ static int get_next_timeout(void)
+ {
++    int ret = user_shared_data ? user_shared_data_timeout : -1;
++
+     if (!list_empty( &abs_timeout_list ) || !list_empty( &rel_timeout_list ))
+     {
+         struct list expired_list, *ptr;
+-        int ret = -1;
+ 
+         /* first remove all expired timers from the list */
+ 
+@@ -911,7 +954,7 @@ static int get_next_timeout(void)
+             struct timeout_user *timeout = LIST_ENTRY( ptr, struct timeout_user, entry );
+             int diff = (timeout->when - current_time + 9999) / 10000;
+             if (diff < 0) diff = 0;
+-            ret = diff;
++            if (ret == -1 || diff < ret) ret = diff;
+         }
+ 
+         if ((ptr = list_head( &rel_timeout_list )) != NULL)
+@@ -921,9 +964,8 @@ static int get_next_timeout(void)
+             if (diff < 0) diff = 0;
+             if (ret == -1 || diff < ret) ret = diff;
+         }
+-        return ret;
+     }
+-    return -1;  /* no pending timeouts */
++    return ret;
+ }
+ 
+ /* server main poll() loop */
+diff --git a/server/file.h b/server/file.h
+index 4c454de4d4..aa5f6216c2 100644
+--- a/server/file.h
++++ b/server/file.h
+@@ -130,6 +130,7 @@ static inline struct fd *get_obj_fd( struct object *obj ) { return obj->ops->get
+ struct timeout_user;
+ extern timeout_t current_time;
+ extern timeout_t monotonic_time;
++extern struct _KUSER_SHARED_DATA *user_shared_data;
+ 
+ #define TICKS_PER_SEC 10000000
+ 
+diff --git a/server/mapping.c b/server/mapping.c
+index ffd20450df..0fcada7f8f 100644
+--- a/server/mapping.c
++++ b/server/mapping.c
+@@ -945,66 +945,15 @@ int get_page_size(void)
+     return page_mask + 1;
+ }
+ 
+-static KSHARED_USER_DATA *kusd = MAP_FAILED;
+-static const timeout_t kusd_timeout = 16 * -TICKS_PER_SEC / 1000;
+-
+-static void kusd_set_current_time( void *private )
+-{
+-    ULONG system_time_high = current_time >> 32;
+-    ULONG system_time_low = current_time & 0xffffffff;
+-    ULONG interrupt_time_high = monotonic_time >> 32;
+-    ULONG interrupt_time_low = monotonic_time & 0xffffffff;
+-    ULONG tick_count_high = (monotonic_time * 1000 / TICKS_PER_SEC) >> 32;
+-    ULONG tick_count_low = (monotonic_time * 1000 / TICKS_PER_SEC) & 0xffffffff;
+-    KSHARED_USER_DATA *ptr = kusd;
+-
+-    add_timeout_user( kusd_timeout, kusd_set_current_time, NULL );
+-
+-    /* on X86 there should be total store order guarantees, so volatile is enough
+-     * to ensure the stores aren't reordered by the compiler, and then they will
+-     * always be seen in-order from other CPUs. On other archs, we need atomic
+-     * intrinsics to guarantee that. */
+-#if defined(__i386__) || defined(__x86_64__)
+-    ptr->SystemTime.High2Time = system_time_high;
+-    ptr->SystemTime.LowPart = system_time_low;
+-    ptr->SystemTime.High1Time = system_time_high;
+-
+-    ptr->InterruptTime.High2Time = interrupt_time_high;
+-    ptr->InterruptTime.LowPart = interrupt_time_low;
+-    ptr->InterruptTime.High1Time = interrupt_time_high;
+-
+-    ptr->TickCount.High2Time = tick_count_high;
+-    ptr->TickCount.LowPart = tick_count_low;
+-    ptr->TickCount.High1Time = tick_count_high;
+-    *(volatile ULONG *)&ptr->TickCountLowDeprecated = tick_count_low;
+-#else
+-    __atomic_store_n(&ptr->SystemTime.High2Time, system_time_high, __ATOMIC_SEQ_CST);
+-    __atomic_store_n(&ptr->SystemTime.LowPart, system_time_low, __ATOMIC_SEQ_CST);
+-    __atomic_store_n(&ptr->SystemTime.High1Time, system_time_high, __ATOMIC_SEQ_CST);
+-
+-    __atomic_store_n(&ptr->InterruptTime.High2Time, interrupt_time_high, __ATOMIC_SEQ_CST);
+-    __atomic_store_n(&ptr->InterruptTime.LowPart, interrupt_time_low, __ATOMIC_SEQ_CST);
+-    __atomic_store_n(&ptr->InterruptTime.High1Time, interrupt_time_high, __ATOMIC_SEQ_CST);
+-
+-    __atomic_store_n(&ptr->TickCount.High2Time, tick_count_high, __ATOMIC_SEQ_CST);
+-    __atomic_store_n(&ptr->TickCount.LowPart, tick_count_low, __ATOMIC_SEQ_CST);
+-    __atomic_store_n(&ptr->TickCount.High1Time, tick_count_high, __ATOMIC_SEQ_CST);
+-    __atomic_store_n(&ptr->TickCountLowDeprecated, tick_count_low, __ATOMIC_SEQ_CST);
+-#endif
+-}
+-
+ void init_kusd_mapping( struct mapping *mapping )
+ {
+-    if (kusd != MAP_FAILED) return;
++    void *ptr;
+ 
++    if (user_shared_data) return;
+     grab_object( mapping );
+     make_object_static( &mapping->obj );
+-
+-    if ((kusd = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED,
+-                      get_unix_fd( mapping->fd ), 0 )) == MAP_FAILED)
+-        set_error( STATUS_NO_MEMORY );
+-    else
+-        kusd_set_current_time( NULL );
++    ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
++    if (ptr != MAP_FAILED) user_shared_data = ptr;
+ }
+ 
+ /* create a file mapping */
+-- 
+2.27.0
+

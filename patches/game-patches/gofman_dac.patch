@@ -1082,7 +1082,7 @@ Subject: [PATCH 16/44] ntdll: Fill more USD fields.
 ---
  dlls/ntdll/nt.c     |  1 -
  dlls/ntdll/thread.c | 30 ++++++++++++++++++++++++++++++
- server/mapping.c    |  2 ++
+ server/fd.c         |  2 ++
  3 files changed, 32 insertions(+), 1 deletion(-)
 
 diff --git a/dlls/ntdll/nt.c b/dlls/ntdll/nt.c
@@ -1138,19 +1138,19 @@ index 6161bdd09318..2b294617bd48 100644
  }
  
  HANDLE user_shared_data_init_done(void)
-diff --git a/server/mapping.c b/server/mapping.c
-index 0221c02060e2..650d8bcde7f9 100644
---- a/server/mapping.c
-+++ b/server/mapping.c
-@@ -1056,6 +1056,8 @@ static void kusd_set_current_time( void *private )
-     ptr->TickCount.LowPart = tick_count_low;
-     ptr->TickCount.High1Time = tick_count_high;
-     *(volatile ULONG *)&ptr->TickCountLowDeprecated = tick_count_low;
+diff --git a/server/fd.c b/server/fd.c
+index 06d1d81bdb..62267e272c 100644
+--- a/server/fd.c
++++ b/server/fd.c
+@@ -399,6 +399,8 @@ static void set_user_shared_data_time(void)
+     user_shared_data->TickCount.LowPart   = tick_count;
+     user_shared_data->TickCount.High1Time = tick_count >> 32;
+     *(volatile ULONG *)&user_shared_data->TickCountLowDeprecated = tick_count;
 +
-+    ptr->LastSystemRITEventTickCount = tick_count_low;
++    user_shared_data->LastSystemRITEventTickCount = tick_count;
  #else
-     __atomic_store_n(&ptr->SystemTime.High2Time, system_time_high, __ATOMIC_SEQ_CST);
-     __atomic_store_n(&ptr->SystemTime.LowPart, system_time_low, __ATOMIC_SEQ_CST);
+     __atomic_store_n(&user_shared_data->SystemTime.High2Time, current_time >> 32, __ATOMIC_SEQ_CST);
+     __atomic_store_n(&user_shared_data->SystemTime.LowPart, current_time, __ATOMIC_SEQ_CST);
 -- 
 2.26.2
 

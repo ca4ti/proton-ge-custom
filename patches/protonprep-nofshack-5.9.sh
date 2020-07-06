@@ -281,9 +281,9 @@
     patch -Np1 < ../patches/game-patches/diablo_1_menu.patch
     
 
-    echo "Remi's memory performance fixes"    
-    patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/ntdll-Use_the_free_ranges_in_find_reserved_free_area.patch
-    patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/makedep-Align_PE_sections_so_they_can_be_mmapped.patch
+#    echo "Remi's memory performance fixes"    
+#    patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/ntdll-Use_the_free_ranges_in_find_reserved_free_area.patch
+#    patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/makedep-Align_PE_sections_so_they_can_be_mmapped.patch
     
 
 

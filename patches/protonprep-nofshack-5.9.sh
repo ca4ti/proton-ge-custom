@@ -147,8 +147,8 @@
     echo "assetto corsa"
     patch -Np1 < ../patches/game-patches/assettocorsa-hud.patch
 
-    echo "sword art online"
-    patch -Np1 < ../patches/game-patches/sword-art-online-gnutls.patch
+#    echo "sword art online"
+#    patch -Np1 < ../patches/game-patches/sword-art-online-gnutls.patch
 
     echo "origin downloads fix" 
     patch -Np1 < ../patches/game-patches/origin-downloads_fix.patch
@@ -173,6 +173,8 @@
 #  TODO: Add game-specific check
     echo "mk11 patch"
     patch -Np1 < ../patches/game-patches/mk11.patch
+#    patch -Np1 < ../patches/game-patches/mk11_testing.patch
+
 
 #   The game uses CEG which does not work in proton.    
     echo "blackops 2 fix"
@@ -281,7 +283,6 @@
     echo "Paul's Diablo 1 menu fix"
     patch -Np1 < ../patches/game-patches/diablo_1_menu.patch
     
-
 #    echo "Remi's memory performance fixes"    
 #    patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/ntdll-Use_the_free_ranges_in_find_reserved_free_area.patch
 #    patch -Np1 < ../patches/wine-hotfixes/backports-for-5.9/makedep-Align_PE_sections_so_they_can_be_mmapped.patch
